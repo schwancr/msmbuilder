@@ -15,9 +15,9 @@ public:
                              const DoubleArray2D& means,
                              const DoubleArray2D& variances);
 
-    DiagonalGaussianHMMSufficientStats* initializeSufficientStats();
-    FloatArray2D emissionLogLikelihood(const FloatArray2D& X);
-    void accumulateSufficientStats(DiagonalGaussianHMMSufficientStats& stats, const FloatArray2D& seq, const FloatArray1D& frameLogProb,
+    virtual DiagonalGaussianHMMSufficientStats* initializeSufficientStats();
+    virtual FloatArray2D emissionLogLikelihood(const FloatArray2D& X);
+    virtual void accumulateSufficientStats(DiagonalGaussianHMMSufficientStats& stats, const FloatArray2D& seq, const FloatArray1D& frameLogProb,
                                    const FloatArray2D& posteriors, const DoubleArray2D& fwdLattice, const DoubleArray2D& bwdLattice);
 
 protected:

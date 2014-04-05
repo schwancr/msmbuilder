@@ -85,6 +85,8 @@ void DiagonalGaussianHMMEstep::accumulateSufficientStats(
     const FloatArray2D& posteriors, const DoubleArray2D& fwdLattice, const DoubleArray2D& bwdLattice)
 {
     HMMEstep::accumulateSufficientStats(stats, seq, frameLogProb, posteriors, fwdLattice, bwdLattice);
+    
+    
     const float alpha = 1.0;
     const float beta = 1.0;
     const int length = seq.shape()[0];
