@@ -1,0 +1,108 @@
+#include <numeric>
+#include <vector>
+#include <map>
+#include <cmath>
+#include <cassert>
+#include <iostream>
+#include "HMMEstep.hpp"
+#include "forward.hpp"
+#include "backward.hpp"
+#include "posteriors.hpp"
+#include "transitioncounts.hpp"
+
+namespace Mixtape {
+
+HMMEstep::HMMEstep(const int numStates, const DoubleArray2D& transMat, const DoubleArray1D& startProb)
+    : numStates_(numStates)
+    , logStartProb_(boost::extents[numStates_])
+    , logTransmat_(boost::extents[numStates_][numStates_])
+    , logTransmat_T_(boost::extents[numStates_][numStates_])
+{
+    if (numStates_ != transMat.shape()[0] || numStates_ != transMat.shape()[1])
+        throw MixtapeException("transmat has wrong shape");
+    if (numStates_ != startProb.shape()[0])
+        throw MixtapeException("startprob has wrong shape");
+
+
+    typedef DoubleArray2D::index index;
+    for (index i = 0; i < numStates_; i++) {
+        for (index j = 0; j < numStates_; j++) {
+            logTransmat_[i][j] = log(transMat[i][j]);
+            logTransmat_T_[j][i] = log(transMat[i][j]);
+        }
+    }
+
+    for (index i = 0; i < numStates_; i++)
+        logStartProb_[i] = log(startProb[i]);
+}
+
+void HMMEstep::addSequence(const FloatArray2D* X) {
+    sequences_.push_back(X);
+}
+
+
+HMMSufficientStats* HMMEstep::initializeSufficientStats() {
+    HMMSufficientStats* stats = new HMMSufficientStats(numStates_);
+    return stats;
+}
+
+DoubleArray2D HMMEstep::forwardPass(const FloatArray2D& frameLogProb) {
+    assert(frameLogProb.shape()[1] == numStates_);
+    DoubleArray2D forwardLattice(boost::extents[frameLogProb.shape()[0]][numStates_]);
+    forward<double>(&logTransmat_T_[0][0], &logStartProb_[0], &frameLogProb[0][0], frameLogProb.shape()[0],
+                    frameLogProb.shape()[1], &forwardLattice[0][0]);
+    return forwardLattice;
+}
+
+DoubleArray2D HMMEstep::backwardPass(const FloatArray2D& frameLogProb) {
+    assert(frameLogProb.shape()[1] == numStates_);
+    DoubleArray2D backwardLattice(boost::extents[frameLogProb.shape()[0]][numStates_]);
+    backward<double>(&logTransmat_[0][0], &logStartProb_[0], &frameLogProb[0][0], frameLogProb.shape()[0],
+                    frameLogProb.shape()[1], &backwardLattice[0][0]);
+    return backwardLattice;
+}
+
+FloatArray2D HMMEstep::computePosteriors(const DoubleArray2D& fwdLattice, const DoubleArray2D& bwdLattice) {
+    assert(fwdLattice.shape()[0] == bwdLattice.shape()[0]);
+    assert(fwdLattice.shape()[1] == bwdLattice.shape()[1]);
+    assert(fwdLattice.shape()[1] == numStates_);
+
+    FloatArray2D posteriors(boost::extents[fwdLattice.shape()[0]][numStates_]);
+    compute_posteriors<double>(&fwdLattice[0][0], &bwdLattice[0][0], fwdLattice.shape()[0], numStates_, &posteriors[0][0]);
+    return posteriors;
+}
+
+HMMSufficientStats HMMEstep::execute() {
+    HMMSufficientStats* stats = initializeSufficientStats();
+    for (int i = 0; i < sequences_.size(); i++) {
+        const FloatArray2D& sequence = *sequences_[i];
+
+        FloatArray2D frameLogProb = emissionLogLikelihood(sequence);
+        DoubleArray2D fwdLattice = forwardPass(frameLogProb);
+        DoubleArray2D bwdLattice = backwardPass(frameLogProb);
+        FloatArray2D posteriors = computePosteriors(fwdLattice, bwdLattice);
+        accumulateSufficientStats(*stats, sequence, frameLogProb, posteriors, fwdLattice, bwdLattice);
+    }
+
+    HMMSufficientStats stats2 = *stats;
+    delete stats;
+    return stats2;
+}
+
+
+void HMMEstep::accumulateSufficientStats(
+    HMMSufficientStats& stats, const FloatArray2D& seq, const FloatArray1D& frameLogProb,
+    const FloatArray2D& posteriors, const DoubleArray2D& fwdLattice, const DoubleArray2D& bwdLattice)
+{
+    double logProb = 0;
+    const int length = seq.shape()[0];
+
+    DoubleArray2D transCounts(boost::extents[numStates_][numStates_]);
+    transitioncounts<double>(&fwdLattice[0][0], &bwdLattice[0][0], &logTransmat_[0][0], &frameLogProb[0][0], length, numStates_, &transCounts[0][0], &logProb);
+
+    stats.incrementTransCounts(transCounts);
+    stats.incrementLogProb(logProb);
+}
+
+
+} // namespace
