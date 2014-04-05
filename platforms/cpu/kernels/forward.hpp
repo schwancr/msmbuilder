@@ -11,8 +11,8 @@ namespace Mixtape {
 
 template <typename REAL>
 void forward(
-const float* __restrict__ log_transmat_T,
-const float* __restrict__ log_startprob,
+const double* __restrict__ log_transmat_T,
+const double* __restrict__ log_startprob,
 const float* __restrict__ frame_logprob,
 const int sequence_length,
 const int n_states,

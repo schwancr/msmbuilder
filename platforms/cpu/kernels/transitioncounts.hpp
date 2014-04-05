@@ -16,12 +16,12 @@ namespace Mixtape {
 template <typename REAL>
 void transitioncounts(const REAL* __restrict__ fwdlattice,
                       const REAL* __restrict__ bwdlattice,
-                      const float* __restrict__ log_transmat,
+                      const double* __restrict__ log_transmat,
                       const float* __restrict__ framelogprob,
                       const int n_observations,
                       const int n_states,
-                      float* __restrict__ transcounts,
-                      float* logprob)
+                      double* __restrict__ transcounts,
+                      double* logprob)
 {
     int i, j, t;
     REAL* work_buffer;
