@@ -90,33 +90,39 @@ int main() {
     estep.addSequence(&sequence);
     estep.print(estep.execute().transCounts());
 
+    FloatArray2D trans(boost::extents[2][2]);
+    trans[0][0] = 2.618599;  trans[0][1] = 1.587088;  
+    trans[1][0] = 1.328123;  trans[1][1] = 3.466190;
+    assertArrayEqual(estep.execute().transCounts(), trans);
+
+
     cout << "Done" << endl;
     return 1;
 }
 
 
-
-// from __future__ import print_function
-// import numpy as np
-// from sklearn.hmm import GaussianHMM
-// hmm = GaussianHMM(n_components=2, covariance_type='diag')
-// hmm.startprob_ = np.array([0.6, 0.4])
-// hmm.transmat_ = np.array([[0.7, 0.3], [0.4, 0.6]])
-// hmm.means_ = np.array([[0], [2]])
-// hmm.covars_ = np.ones((2,1))
-// sequence = np.sin(np.arange(10)).reshape(10,1) + 1
-// frameLogProb = hmm._compute_log_likelihood(sequence)
-// def printArray(name, a):
-//     print('FloatArray2D %s(boost::extents[%d][%d]);' % ((name, ) + a.shape))
-//     for i in range(a.shape[0]):
-//         for j in range(a.shape[1]):
-//             print('%s[%d][%d] = %f;  ' % (name, i, j, a[i][j]), end='')
-//         print()
-// logl, fwdlattice = hmm._do_forward_pass(frameLogProb)
-// bwdlattice = hmm._do_backward_pass(frameLogProb)
-// printArray('refFrameLogProb', frameLogProb)
-// printArray('refForward', fwdlattice)
-// printArray('refBackward', bwdlattice)
-// hmm._do_mstep = lambda a, b: print(a)
-// hmm.fit([sequence])
-
+/*
+from __future__ import print_function
+import numpy as np
+from sklearn.hmm import GaussianHMM
+hmm = GaussianHMM(n_components=2, covariance_type='diag')
+hmm.startprob_ = np.array([0.6, 0.4])
+hmm.transmat_ = np.array([[0.7, 0.3], [0.4, 0.6]])
+hmm.means_ = np.array([[0], [2]])
+hmm.covars_ = np.ones((2,1))
+sequence = np.sin(np.arange(10)).reshape(10,1) + 1
+frameLogProb = hmm._compute_log_likelihood(sequence)
+def printArray(name, a):
+    print('FloatArray2D %s(boost::extents[%d][%d]);' % ((name, ) + a.shape))
+    for i in range(a.shape[0]):
+        for j in range(a.shape[1]):
+            print('%s[%d][%d] = %f;  ' % (name, i, j, a[i][j]), end='')
+        print()
+logl, fwdlattice = hmm._do_forward_pass(frameLogProb)
+bwdlattice = hmm._do_backward_pass(frameLogProb)
+printArray('refFrameLogProb', frameLogProb)
+printArray('refForward', fwdlattice)
+printArray('refBackward', bwdlattice)
+hmm._do_mstep = lambda a, b: printArray('trans', a['trans'])
+hmm.fit([sequence])
+*/
