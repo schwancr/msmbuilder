@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 2.6)
-
 find_package(Boost REQUIRED)
-find_package(blas REQUIRED)
+find_package(BLAS REQUIRED)
 
 
 
