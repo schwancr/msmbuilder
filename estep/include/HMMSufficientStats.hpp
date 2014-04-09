@@ -1,6 +1,7 @@
 #ifndef MIXTAPE_HMMSUFFICIENTSTATS_H
 #define MIXTAPE_HMMSUFFICIENTSTATS_H
 #include "typedefs.hpp"
+#include "HMMEstep.hpp"
 
 namespace Mixtape {
 class HMMSufficientStats {
@@ -18,20 +19,17 @@ public:
     DoubleArray1D& startCounts() { return startCounts_; }
     DoubleArray2D& transCounts() { return transCounts_; }
 
-    void incrementLogProb(double logProb) {
-        logProb_ += logProb;
-    }
-    void incrementTransCounts(const DoubleArray2D& transCounts) {
-        typedef DoubleArray2D::index index;
-        for (index i = 0; i < numStates_; i++)
-            for (index j = 0; j < numStates_; j++)
-                transCounts_[i][j] += transCounts[i][j];
-    }
+    virtual void increment(const HMMEstep* estep,
+                           const FloatArray2D& seq,
+                           const FloatArray2D& frameLogProb,
+                           const FloatArray2D& posteriors,
+                           const DoubleArray2D& fwdLattice,
+                           const DoubleArray2D& bwdLattice);
 
- 
+protected:
+    int numStates_;
 
 private:
-    int numStates_;
     int numObservations_;
     double logProb_;
     DoubleArray1D startCounts_;

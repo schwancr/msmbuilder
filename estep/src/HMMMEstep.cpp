@@ -8,7 +8,7 @@
 #include "forward.hpp"
 #include "backward.hpp"
 #include "posteriors.hpp"
-#include "transitioncounts.hpp"
+#include "DiagonalGaussianHMMEstep.hpp"
 
 namespace Mixtape {
 
@@ -72,7 +72,7 @@ FloatArray2D HMMEstep::computePosteriors(const DoubleArray2D& fwdLattice, const 
     return posteriors;
 }
 
-HMMSufficientStats HMMEstep::execute() {
+HMMSufficientStats* HMMEstep::execute() {
     HMMSufficientStats* stats = initializeSufficientStats();
     for (int i = 0; i < sequences_.size(); i++) {
         const FloatArray2D& sequence = *sequences_[i];
@@ -81,27 +81,11 @@ HMMSufficientStats HMMEstep::execute() {
         DoubleArray2D fwdLattice = forwardPass(frameLogProb);
         DoubleArray2D bwdLattice = backwardPass(frameLogProb);
         FloatArray2D posteriors = computePosteriors(fwdLattice, bwdLattice);
-        accumulateSufficientStats(*stats, sequence, frameLogProb, posteriors, fwdLattice, bwdLattice);
+
+        stats->increment(this, sequence, frameLogProb, posteriors, fwdLattice, bwdLattice);
     }
 
-    HMMSufficientStats stats2 = *stats;
-    delete stats;
-    return stats2;
-}
-
-
-void HMMEstep::accumulateSufficientStats(
-    HMMSufficientStats& stats, const FloatArray2D& seq, const FloatArray1D& frameLogProb,
-    const FloatArray2D& posteriors, const DoubleArray2D& fwdLattice, const DoubleArray2D& bwdLattice)
-{
-    double logProb = 0;
-    const int length = seq.shape()[0];
-
-    DoubleArray2D transCounts(boost::extents[numStates_][numStates_]);
-    transitioncounts<double>(&fwdLattice[0][0], &bwdLattice[0][0], &logTransmat_[0][0], &frameLogProb[0][0], length, numStates_, &transCounts[0][0], &logProb);
-
-    stats.incrementTransCounts(transCounts);
-    stats.incrementLogProb(logProb);
+    return stats;
 }
 
 

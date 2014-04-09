@@ -1,5 +1,5 @@
+#include <cstdio>
 #include <cmath>
-#include "cblas.h"
 #include "MixtapeException.hpp"
 #include "DiagonalGaussianHMMSufficientStats.hpp"
 #include "DiagonalGaussianHMMEstep.hpp"
@@ -76,42 +76,9 @@ FloatArray2D DiagonalGaussianHMMEstep::emissionLogLikelihood(const FloatArray2D&
 }
 
 DiagonalGaussianHMMSufficientStats* DiagonalGaussianHMMEstep::initializeSufficientStats() {
-    DiagonalGaussianHMMSufficientStats* stats = new DiagonalGaussianHMMSufficientStats(numStates_);
+    DiagonalGaussianHMMSufficientStats* stats = new DiagonalGaussianHMMSufficientStats(numStates_, numFeatures_);
     return stats;
 }
-
-void DiagonalGaussianHMMEstep::accumulateSufficientStats(
-    DiagonalGaussianHMMSufficientStats& stats, const FloatArray2D& seq, const FloatArray1D& frameLogProb,
-    const FloatArray2D& posteriors, const DoubleArray2D& fwdLattice, const DoubleArray2D& bwdLattice)
-{
-    HMMEstep::accumulateSufficientStats(stats, seq, frameLogProb, posteriors, fwdLattice, bwdLattice);
-    
-    
-    const float alpha = 1.0;
-    const float beta = 1.0;
-    const int length = seq.shape()[0];
-    assert(seq.shape()[1] == numFeatures_);
-
-    FloatArray2D obs(boost::extents[numStates_][numFeatures_]);
-    FloatArray2D obs2(boost::extents[numStates_][numFeatures_]);
-    FloatArray2D seq2(boost::extents[length][numFeatures_]);
-
-    typedef FloatArray2D::index index;
-    for (index i = 0; i < length; i++)
-        for (index j = 0; j < length; j++)
-            seq2[i][j] = seq[i][j];
-    
-    sgemm_("N", "T", &numFeatures_, &numStates_, &length, &alpha, &seq[0][0],
-           &numFeatures_, &posteriors[0][0], &numStates_, &beta, &obs[0][0],
-           &numFeatures_);
-    sgemm_("N", "T", &numFeatures_, &numStates_, &length, &alpha, &seq2[0][0],
-           &numFeatures_, &posteriors[0][0], &numStates_, &beta, &obs2[0][0],
-           &numFeatures_);
-    //for (k = 0; k < n_states; k++)
-    //for (j = 0; j < sequence_lengths[i]; j++)
-    //seq_post[k] += posteriors[j*n_states + k];
-}
-
 
 
 

@@ -1,8 +1,8 @@
 #ifndef MIXTAPE_DIAGONALGAUSSIANHMMESTEP_H
 #define MIXTAPE_DIAGONALGAUSSIANHMMESTEP_H
 #include "typedefs.hpp"
-#include "DiagonalGaussianHMMSufficientStats.hpp"
 #include "HMMEstep.hpp"
+#include "DiagonalGaussianHMMSufficientStats.hpp"
 
 namespace Mixtape {
 
@@ -17,8 +17,6 @@ public:
 
     virtual DiagonalGaussianHMMSufficientStats* initializeSufficientStats();
     virtual FloatArray2D emissionLogLikelihood(const FloatArray2D& X);
-    virtual void accumulateSufficientStats(DiagonalGaussianHMMSufficientStats& stats, const FloatArray2D& seq, const FloatArray1D& frameLogProb,
-                                   const FloatArray2D& posteriors, const DoubleArray2D& fwdLattice, const DoubleArray2D& bwdLattice);
 
 protected:
     const int numFeatures_;

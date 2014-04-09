@@ -6,7 +6,7 @@
 namespace Mixtape {
 
 typedef boost::multi_array<float, 2>  FloatArray2D;
-typedef boost::multi_array<float, 2>  FloatArray1D;
+typedef boost::multi_array<float, 1>  FloatArray1D;
 typedef boost::multi_array<double, 2> DoubleArray2D;
 typedef boost::multi_array<double, 1> DoubleArray1D;
 

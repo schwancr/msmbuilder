@@ -10,7 +10,7 @@
 #include "float.h"
 #include "stdio.h"
 #include "stdlib.h"
-#include "logsumexp.hpp"
+#include "LogSumExp.hpp"
 namespace Mixtape {
 
 template <typename REAL>
