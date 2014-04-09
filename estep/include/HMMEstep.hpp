@@ -35,9 +35,9 @@ public:
      * X : 2d array of shaep (numSamples, numFeatures)
      *     X is a pointer single timeseries, one of the data sequences to
      *     train the model on
-     * 
+     *
      * Memory Management
-     * ----------------- 
+     * -----------------
      * HMMEstep does *not* assume ownership over the memory in X, and will
      * not free it. It's the caller's responsibility to make sure that X is
      * not cleaned up before HMMEstep is deleted.
@@ -78,7 +78,7 @@ public:
      * ----------
      * X : 2d array of shaep (numSamples, numFeatures)
      *     X is a single timeseries, the "raw data" being fit by the model.
-     * 
+     *
      * Returns
      * -------
      * logl : 2d array of shape (numSamples, numStates)
@@ -93,12 +93,12 @@ public:
     /* Methods for the forward-backward algorithim. Clients should not need  */
     /* to access these directly.                                             */
     /*-----------------------------------------------------------------------*/
-    
+
     /**
      * Run the forward portion of the forward-backward algorithm
      */
     DoubleArray2D forwardPass(const FloatArray2D& frameLogProb);
-    
+
     /**
      * Run the backward part of the forwarf-backward algorithim
      */

@@ -20,10 +20,25 @@ public:
         , transCounts_(boost::extents[numStates][numStates])
     { };
 
+    /**
+     * Total number of data points that we trained on. (sum across all
+     * the sequences)
+     */
     int numObservations() { return numObservations_; }
-    void numObservations(int numObservations) { numObservations_ = numObservations; }
+
+    /**
+     * Overall log probability of the data
+     */
     double logProb() { return logProb_; }
+
+    /**
+     * Expected number of sequences that started in each state
+     */
     DoubleArray1D& startCounts() { return startCounts_; }
+
+    /**
+     * Expected number of transitions from state to state
+     */
     DoubleArray2D& transCounts() { return transCounts_; }
 
     virtual void increment(const HMMEstep* estep,

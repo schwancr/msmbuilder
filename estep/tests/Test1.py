@@ -11,7 +11,7 @@ def printArray(name, a):
                 print('%s[%d][%d] = %f;  ' % (name, i, j, a[i][j]), end='')
             print()
     elif a.ndim == 1:
-        print('FloatArray2D %s(boost::extents[%d]);' % ((name, ) + a.shape))
+        print('FloatArray1D %s(boost::extents[%d]);' % ((name, ) + a.shape))
         for j in range(a.shape[0]):
             print('%s[%d] = %f;  ' % (name, j, a[j]), end='')
     else:
@@ -33,6 +33,7 @@ class MyGaussianHMM(GaussianHMM):
         printArray('refPosts', stats['post'])
         printArray('refObs', stats['obs'])
         printArray('refObs2', stats['obs**2'])
+        printArray('refStart', stats['start'])
         print()
         exit(1)
 

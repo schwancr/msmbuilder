@@ -114,6 +114,9 @@ int main() {
     FloatArray2D refObs2(boost::extents[2][1]);
     refObs2[0][0] = 3.905322;
     refObs2[1][0] = 14.710568;
+    FloatArray1D refStart(boost::extents[2]);
+    refStart[0] = 0.469522;  refStart[1] = 0.530478;
+
 
     HMMSufficientStats* stats = estep.execute();
     DiagonalGaussianHMMSufficientStats* dstats = static_cast<DiagonalGaussianHMMSufficientStats*>(stats);
@@ -130,6 +133,9 @@ int main() {
     assertArrayEqual(dstats->obs2(), refObs2);
     ASSERT_EQUAL_TOL(dstats->posts()[0], refPosts[0], 1e-6);
     ASSERT_EQUAL_TOL(dstats->posts()[1], refPosts[1], 1e-6);
+    ASSERT_EQUAL_TOL(dstats->startCounts()[0], refStart[0], 1e-6);
+    ASSERT_EQUAL_TOL(dstats->startCounts()[1], refStart[1], 1e-6);
+    assert(dstats->numObservations() == 10);
 
     cout << "Done" << endl;
     delete stats;

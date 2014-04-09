@@ -32,6 +32,11 @@ void HMMSufficientStats::increment(const HMMEstep* estep,
 
     // increment logprob
     logProb_ += logProb;
+
+    numObservations_ += length;
+
+    for (index i = 0; i < numStates_; i++)
+        startCounts_[i] += posteriors[0][i];
 }
 
 }  // namespace Mixtape
