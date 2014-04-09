@@ -1,3 +1,10 @@
+/*****************************************************************/
+/*    Copyright (c) 2014, Stanford University and the Authors    */
+/*    Author: Robert McGibbon <rmcgibbo@gmail.com>               */
+/*    Contributors:                                              */
+/*                                                               */
+/*****************************************************************/
+
 #ifndef MIXTAPE_TYPEDEFS_H
 #define MIXTAPE_TYPEDEFS_H
 #include <iostream>

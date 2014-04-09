@@ -1,7 +1,13 @@
-#include <cmath>
-#include "kernels/TransitionCounts.hpp"
+/*****************************************************************/
+/*    Copyright (c) 2014, Stanford University and the Authors    */
+/*    Author: Robert McGibbon <rmcgibbo@gmail.com>               */
+/*    Contributors:                                              */
+/*                                                               */
+/*****************************************************************/
+
 #include "HMMEstep.hpp"
 #include "HMMSufficientStats.hpp"
+#include "kernels/TransitionCounts.hpp"
 
 namespace Mixtape {
 
@@ -28,4 +34,4 @@ void HMMSufficientStats::increment(const HMMEstep* estep,
     logProb_ += logProb;
 }
 
-} // namespace
+}  // namespace Mixtape

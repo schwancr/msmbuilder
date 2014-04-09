@@ -1,3 +1,10 @@
+/*****************************************************************/
+/*    Copyright (c) 2014, Stanford University and the Authors    */
+/*    Author: Robert McGibbon <rmcgibbo@gmail.com>               */
+/*    Contributors:                                              */
+/*                                                               */
+/*****************************************************************/
+
 #ifndef MIXTAPE_DIAGONALGAUSSIANHMMESTEP_H
 #define MIXTAPE_DIAGONALGAUSSIANHMMESTEP_H
 #include "typedefs.hpp"

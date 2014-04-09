@@ -1,14 +1,18 @@
-#include <numeric>
+/*****************************************************************/
+/*    Copyright (c) 2014, Stanford University and the Authors    */
+/*    Author: Robert McGibbon <rmcgibbo@gmail.com>               */
+/*    Contributors:                                              */
+/*                                                               */
+/*****************************************************************/
+
 #include <vector>
-#include <map>
 #include <cmath>
 #include <cassert>
-#include <iostream>
 #include "HMMEstep.hpp"
+#include "HMMSufficientStats.hpp"
 #include "kernels/forward.hpp"
 #include "kernels/backward.hpp"
 #include "kernels/posteriors.hpp"
-#include "DiagonalGaussianHMMEstep.hpp"
 
 namespace Mixtape {
 
@@ -89,4 +93,4 @@ HMMSufficientStats* HMMEstep::execute() {
 }
 
 
-} // namespace
+}  // namespace Mixtape

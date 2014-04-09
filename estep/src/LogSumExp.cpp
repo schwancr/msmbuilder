@@ -1,7 +1,13 @@
+/*****************************************************************/
+/*    Copyright (c) 2014, Stanford University and the Authors    */
+/*    Author: Robert McGibbon <rmcgibbo@gmail.com>               */
+/*    Contributors:                                              */
+/*                                                               */
+/*****************************************************************/
+
 #include <emmintrin.h>
-#include "float.h"
-#include <stdio.h>
-#include <math.h>
+#include <cfloat>
+#include <cmath>
 #include "kernels/sse_mathfun.h"
 
 namespace Mixtape {

@@ -1,3 +1,10 @@
+/*****************************************************************/
+/*    Copyright (c) 2014, Stanford University and the Authors    */
+/*    Author: Robert McGibbon <rmcgibbo@gmail.com>               */
+/*    Contributors:                                              */
+/*                                                               */
+/*****************************************************************/
+
 #ifndef MIXTAPE_HMMESTEP_H
 #define MIXTAPE_HMMESTEP_H
 #include <map>

@@ -1,3 +1,10 @@
+/*****************************************************************/
+/*    Copyright (c) 2014, Stanford University and the Authors    */
+/*    Author: Robert McGibbon <rmcgibbo@gmail.com>               */
+/*    Contributors:                                              */
+/*                                                               */
+/*****************************************************************/
+
 #include <cstdio>
 #include <cmath>
 #include "MixtapeException.hpp"
@@ -82,4 +89,4 @@ DiagonalGaussianHMMSufficientStats* DiagonalGaussianHMMEstep::initializeSufficie
 
 
 
-} // namespace
+}  // namespace Mixtape

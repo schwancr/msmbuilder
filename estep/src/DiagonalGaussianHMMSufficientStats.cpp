@@ -1,3 +1,10 @@
+/*****************************************************************/
+/*    Copyright (c) 2014, Stanford University and the Authors    */
+/*    Author: Robert McGibbon <rmcgibbo@gmail.com>               */
+/*    Contributors:                                              */
+/*                                                               */
+/*****************************************************************/
+
 #include <cstdio>
 #include "cblas.h"
 #include "DiagonalGaussianHMMSufficientStats.hpp"
@@ -12,7 +19,7 @@ void DiagonalGaussianHMMSufficientStats::increment(const HMMEstep* estep,
                                                    const DoubleArray2D& bwdLattice)
 {
     HMMSufficientStats::increment(estep, seq, frameLogProb, posteriors, fwdLattice, bwdLattice);
-    
+
     const float alpha = 1.0;
     const float beta = 1.0;
     const int length = seq.shape()[0];
@@ -26,7 +33,7 @@ void DiagonalGaussianHMMSufficientStats::increment(const HMMEstep* estep,
     for (index i = 0; i < length; i++)
         for (index j = 0; j < numFeatures_; j++)
             seq2[i][j] = seq[i][j] * seq[i][j];
-    
+
     sgemm_("N", "T", &numFeatures_, &numStates_, &length, &alpha, &seq[0][0],
            &numFeatures_, &posteriors[0][0], &numStates_, &beta, &obs[0][0],
            &numFeatures_);
@@ -38,7 +45,7 @@ void DiagonalGaussianHMMSufficientStats::increment(const HMMEstep* estep,
     for (index j = 0; j < length; j++)
         for (index k = 0; k < numStates_; k++)
             posts_[k] += posteriors[j][k];
-    
+
     // increment obs and obs**2
     for (index i = 0; i < numStates_; i++) {
         for (index j = 0; j < numFeatures_; j++) {
@@ -49,4 +56,4 @@ void DiagonalGaussianHMMSufficientStats::increment(const HMMEstep* estep,
 }
 
 
-}
+}  // namespace Mixtape
