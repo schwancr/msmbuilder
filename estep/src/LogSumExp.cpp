@@ -2,7 +2,7 @@
 #include "float.h"
 #include <stdio.h>
 #include <math.h>
-#include "sse_mathfun.h"
+#include "kernels/sse_mathfun.h"
 
 namespace Mixtape {
 

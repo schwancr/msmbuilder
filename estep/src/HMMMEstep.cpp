@@ -5,9 +5,9 @@
 #include <cassert>
 #include <iostream>
 #include "HMMEstep.hpp"
-#include "forward.hpp"
-#include "backward.hpp"
-#include "posteriors.hpp"
+#include "kernels/forward.hpp"
+#include "kernels/backward.hpp"
+#include "kernels/posteriors.hpp"
 #include "DiagonalGaussianHMMEstep.hpp"
 
 namespace Mixtape {

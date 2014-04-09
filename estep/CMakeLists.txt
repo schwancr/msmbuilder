@@ -6,8 +6,6 @@ find_package(BLAS REQUIRED)
 
 file(GLOB_RECURSE MIXTAPE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/*")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include/")
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../platforms/cpu/kernels/")
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../platforms/cpu/kernels/include")
 include_directories(${Boost_INCLUDE_DIRS})
 
 
