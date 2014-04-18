@@ -72,5 +72,33 @@ private:
 };
 
 
+void doDiagonalGaussianHMMEstep(const int numStates,
+                                const double* transmat,
+                                const double* startProb,
+                                const int numFeatures,
+                                const double* means,
+                                const double* variances,
+                                const int numSequences,
+                                const int* sequenceLengths,
+                                const float** sequences,
+                                float* transcounts,
+                                float* posts,
+                                float* obs,
+                                float* obs2)
+{
+    boost::const_multi_array_ref<double, 2> transmat_(transmat, boost::extents[numStates][numStates]);
+    boost::const_multi_array_ref<double, 1> startProb_(startProb, boost::extents[numStates]);
+    boost::const_multi_array_ref<double, 2> means_(means, boost::extents[numStates][numFeatures]);
+    boost::const_multi_array_ref<double, 2> variances_(variances, boost::extents[numStates][numFeatures]);
+    
+    DiagonalGaussianHMMEstep model(numStates, transmat_, startProb_, numFeatures, means_, variances_);
+    for (int i = 0; i < numSequences; i++) {
+        boost::const_multi_array_ref<float, 2> sequence_(sequences[i], boost::extents[sequenceLengths[i]][numFeatures]);
+        model.addSequence(&sequence_);
+    }
+    model.execute();
+   
+}
+
 } // namespace
 #endif
