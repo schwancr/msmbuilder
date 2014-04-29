@@ -42,7 +42,7 @@ public:
      * not free it. It's the caller's responsibility to make sure that X is
      * not cleaned up before HMMEstep is deleted.
      */
-    void addSequence(const FloatArray2D* X);
+    void addSequence(const FloatArray2D& X);
 
 
     /**

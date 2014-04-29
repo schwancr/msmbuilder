@@ -55,7 +55,7 @@ int main() {
         sequence[i][0] = sin(i) + 1;
 
     DiagonalGaussianHMMEstep estep = DiagonalGaussianHMMEstep(2, transMat, startProb, 1, means, variances);
-    estep.addSequence(&sequence);
+    estep.addSequence(sequence);
 
 
     /* training data from python */

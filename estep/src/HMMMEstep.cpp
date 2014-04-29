@@ -40,8 +40,9 @@ HMMEstep::HMMEstep(const int numStates, const DoubleArray2D& transMat, const Dou
         logStartProb_[i] = log(startProb[i]);
 }
 
-void HMMEstep::addSequence(const FloatArray2D* X) {
-    sequences_.push_back(X);
+void HMMEstep::addSequence(const FloatArray2D& X) {
+    const FloatArray2D* x = &X;
+    sequences_.push_back(x);
 }
 
 
