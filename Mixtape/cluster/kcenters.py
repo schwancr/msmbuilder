@@ -37,7 +37,7 @@ __all__ = ['KCenters']
 #-----------------------------------------------------------------------------
 
 class _KCenters(BaseEstimator, ClusterMixin):
-    """KCenters clustering
+    """K-Centers clustering
 
     Parameters
     ----------
