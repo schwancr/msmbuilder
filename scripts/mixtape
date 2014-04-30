@@ -1,0 +1,16 @@
+#!/usr/bin/env python
+'Mixtape commands'
+from mixtape.cmdline import App, NumpydocClassCommand
+# the commands register themselves when they're imported
+from mixtape.commands2 import *
+
+
+class MixtapeApp(App):
+    def _subcommands(self):
+        for e in super(MixtapeApp, self)._subcommands():
+            if issubclass(e, NumpydocClassCommand):
+                yield e
+
+
+app = MixtapeApp(name='mixtape', description=__doc__)
+app.start()

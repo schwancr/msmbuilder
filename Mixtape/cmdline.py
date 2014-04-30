@@ -52,11 +52,13 @@ if __name__ == '__main__':
 #-----------------------------------------------------------------------------
 
 from __future__ import print_function, division, absolute_import
-from six import with_metaclass
+from six import with_metaclass, string_types
 import re
 import sys
 import abc
 import argparse
+import inspect
+import numpydoc
 from IPython.utils.text import wrap_paragraphs
 
 __all__ = ['argument', 'argument_group', 'Command', 'App', 'FlagAction',
@@ -181,6 +183,9 @@ class mutually_exclusive_group(object):
 # Command Classes
 #-----------------------------------------------------------------------------
 
+class ClassProperty(property):
+    def __get__(self, cls, owner):
+        return self.fget.__get__(None, owner)()
 
 class Command(with_metaclass(abc.ABCMeta, object)):
 
@@ -197,6 +202,76 @@ class Command(with_metaclass(abc.ABCMeta, object)):
     def error(self, msg):
         print(msg, file=sys.stderr)
         exit(1)
+
+
+class NumpydocClassCommand(Command):
+    """Subclass of Command that automatically populates arguments from
+    the __init__ signature of a klass
+    """
+    klass = None
+    description = ''
+
+    def __init__(self, args):
+        init_args = inspect.getargspec(self.klass.__init__)[0]
+        kwargs = {k:v for k, v in args.__dict__.items() if k in init_args}
+
+        # set all of the args as attributes on the class
+        for k, v in args.__dict__.items():
+            setattr(self, k, v)
+        self.instance = self.klass(**kwargs)
+
+    @classmethod
+    def _get_name(cls):
+        return cls.klass.__name__.lower()
+
+    @classmethod
+    def _register_arguments(cls, subparser):
+        assert cls.klass is not None
+        # inspect __init__
+        try:
+            args, varargs, keywords, defaults = inspect.getargspec(cls.klass.__init__)
+        except TypeError:
+            args = []
+
+        doc = numpydoc.docscrape.ClassDoc(cls.klass)
+        helptext = {d[0]: ' '.join(d[2]) for d in doc['Parameters']}
+        typemap = {d[0]: d[1].replace(',', ' ').split(' ')[0] for d in doc['Parameters']}
+
+        group = argument_group('instance arguments')
+
+        for i, arg in enumerate(args):
+            if i == 0 and arg == 'self':
+                continue
+
+            # get default value
+            kwargs = {}
+            try:
+                kwargs['default'] = defaults[i-len(args)]
+            except (IndexError, TypeError):
+                kwargs['required'] = True
+
+            if arg in helptext:
+                kwargs['help'] = helptext[arg]
+            if arg in typemap and typemap[arg] == 'list':
+                kwargs['nargs'] = '+'
+            if arg in typemap and typemap[arg] == 'bool':
+                kwargs['action'] = FlagAction
+            if arg in typemap and typemap[arg] in ['str', 'int']:
+                kwargs['type'] = eval(typemap[arg])
+
+            group.add_argument('--{}'.format(arg), **kwargs)
+
+        group.register(subparser)
+
+    @classmethod
+    def description(cls):
+        doc = numpydoc.docscrape.ClassDoc(cls.klass)
+        summary = ' '.join(doc['Summary'])
+        if not summary.endswith('.'):
+            summary += '.'
+        extended = ' '.join(doc['Extended Summary'])
+        return '%s %s' % (summary, extended)
+
 
 
 class App(object):
@@ -236,22 +311,28 @@ class App(object):
         subparsers = parser.add_subparsers(dest=self.subcommand_dest, title="commands", metavar="")
         for klass in self._subcommands():
             # http://stackoverflow.com/a/17124446/1079728
+            klass_description = klass.description
+            if callable(klass_description):
+                klass_description = klass_description()
+
             first_sentence = ' '.join(
-                ' '.join(re.split(r'(?<=[.:;])\s', klass.description)[:1]).split())
-            description = '\n\n'.join(wrap_paragraphs(klass.description))
+                ' '.join(re.split(r'(?<=[.:;])\s', klass_description)[:1]).split())
+            description = '\n\n'.join(wrap_paragraphs(klass_description))
             subparser = subparsers.add_parser(
-                klass._get_name(), help=first_sentence, description=description, formatter_class=argparse.RawDescriptionHelpFormatter)
+                klass._get_name(), help=first_sentence, description=description, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
             for v in (getattr(klass, e) for e in dir(klass)):
                 if isinstance(v, (argument, argument_group, mutually_exclusive_group)):
                     if v.parent is None:
                         v.register(subparser)
+            if issubclass(klass, NumpydocClassCommand):
+                klass._register_arguments(subparser)
 
         return parser
 
     @classmethod
     def _subcommands(cls):
         for subclass in all_subclasses(Command):
-            if subclass != cls:
+            if subclass not in [cls, NumpydocClassCommand]:
                 yield subclass
 
 

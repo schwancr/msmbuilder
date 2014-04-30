@@ -137,8 +137,15 @@ class AtomPairsFeaturizer(Featurizer):
 
 
 class DihedralFeaturizer(Featurizer):
+    """Featurizer based on dihedral angles.
 
-    """Featurizer based on dihedral angles"""
+    Parameters
+    ----------
+    types : list
+        One or more of ['phi', 'psi', 'omega', 'chi1', 'chi2', 'chi3', 'chi4']
+    sincos : bool
+        Transform to sine and cosine (double the number of featurizers)
+    """
 
     def __init__(self, types, sincos=True):
         if isinstance(types, str):
@@ -165,7 +172,31 @@ class DihedralFeaturizer(Featurizer):
 
 class ContactFeaturizer(Featurizer):
 
-    """Featurizer based on residue-residue distances"""
+    """Featurizer based on residue-residue distances
+
+    Parameters
+    ----------
+    contacts : np.ndarray or 'all'
+        numpy array containing (0-indexed) residues to compute the
+        contacts for. (e.g. np.array([[0, 10], [0, 11]]) would compute
+        the contact between residue 0 and residue 10 as well as
+        the contact between residue 0 and residue 11.) [NOTE: if no
+        array is passed then 'all' contacts are calculated. This means
+        that the result will contain all contacts between residues
+        separated by at least 3 residues.]
+    scheme : {'ca', 'closest', 'closest-heavy'}
+        scheme to determine the distance between two residues:
+            'ca' : distance between two residues is given by the distance
+                between their alpha carbons
+            'closest' : distance is the closest distance between any
+                two atoms in the residues
+            'closest-heavy' : distance is the closest distance between
+                any two non-hydrogen atoms in the residues
+    ignore_nonprotein : bool
+        When using `contact==all`, don't compute contacts between
+        "residues" which are not protein (i.e. do not contain an alpha
+        carbon).
+    """
 
     def __init__(self, contacts='all', scheme='closest-heavy', ignore_nonprotein=True):
         self.contacts = contacts
