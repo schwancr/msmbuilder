@@ -222,6 +222,14 @@ class NumpydocClassCommand(Command):
     >>>    def start(self):
     >>>        print self.instance
 
+    Notes
+    -----
+    argparse lets each argument have a `type`, which converts the input
+    string as passed for that argument on the command line to the object
+    that gets loaded up. This is by default inferred from the docstring, but
+    can also be overridden by defining a method named _<attribute>_type, where
+    <attribute> is the name of the argument (i.e. one of the arguments to
+    klass.__init__)
     """
 
     # subclasses should override this
