@@ -209,7 +209,6 @@ class NumpydocClassCommand(Command):
     the __init__ signature of a klass
     """
     klass = None
-    description = ''
 
     def __init__(self, args):
         init_args = inspect.getargspec(self.klass.__init__)[0]
