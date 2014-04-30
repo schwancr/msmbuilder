@@ -52,7 +52,7 @@ if __name__ == '__main__':
 #-----------------------------------------------------------------------------
 
 from __future__ import print_function, division, absolute_import
-from six import with_metaclass, string_types
+from six import with_metaclass
 import re
 import sys
 import abc
@@ -240,7 +240,11 @@ class NumpydocClassCommand(Command):
 
             if k in init_args:
                 # put the ones for klass.__init__ in a dict
-                kwags[k] = v
+                kwargs[k] = v
+
+                if hasattr(self, '_%s_type' % k):
+                    kwargs[k] = getattr(self, '_%s_type' % k)(v)
+
             else:
                 # set the others as attributes on self
                 setattr(self, k, v)
@@ -332,6 +336,19 @@ class App(object):
         if len(argv) == 0:
             argv.append('-h')
         self.parser = self._build_parser()
+
+        # give a special "did you mean?" message if an invalid subcommand is
+        # invoked
+        cmdnames = [e.dest for e in self.parser._subparsers._actions[1]._choices_actions] + ['-h', '--help']
+        if not argv[0] in cmdnames:
+            import difflib
+            lower2native = {s.lower(): s for s in cmdnames}
+            didyoumean = difflib.get_close_matches(argv[0].lower(),
+                lower2native.keys(), n=1, cutoff=0)[0]
+            self.parser.error("invalid choice: '%s'. did you mean '%s'?" % (
+                argv[0], lower2native[didyoumean]))
+            sys.exit(1)
+
         self.args = self.parser.parse_args(argv)
 
     def start(self):

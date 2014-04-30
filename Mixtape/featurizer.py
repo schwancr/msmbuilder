@@ -104,7 +104,16 @@ class Featurizer(object):
 
 class SuperposeFeaturizer(Featurizer):
 
-    """Featurizer based on euclidian atom distances to reference structure."""
+    """Featurizer based on euclidian atom distances to reference structure.
+
+    Parameters
+    ----------
+    atom_indices : np.ndarray, shape=(n_atoms,), dtype=int
+        The indices of the atoms to superpose and compute the distances with
+    reference_traj : md.Trajectory
+        The reference conformation to superpose each frame with respect to
+        (only the first frame in reference_traj is used)
+    """
 
     def __init__(self, atom_indices, reference_traj):
         self.atom_indices = atom_indices
@@ -112,7 +121,6 @@ class SuperposeFeaturizer(Featurizer):
         self.n_features = len(self.atom_indices)
 
     def featurize(self, traj):
-
         traj.superpose(self.reference_traj, atom_indices=self.atom_indices)
         diff2 = (traj.xyz[:, self.atom_indices] -
                  self.reference_traj.xyz[0, self.atom_indices]) ** 2
@@ -123,11 +131,20 @@ class SuperposeFeaturizer(Featurizer):
 
 class AtomPairsFeaturizer(Featurizer):
 
-    """Featurizer based on atom pair distances."""
+    """Featurizer based on atom pair distances.
+    
+    Parameters
+    ----------
+    pair_indices : np.ndarray, shape=(n_pairs, 2), dtype=int
+        Each row gives the indices of two atoms involved in the interaction.
+    periodic : bool, default=False
+        If `periodic` is True and the trajectory contains unitcell
+        information, we will compute distances under the minimum image
+        convention.
+    """
 
-    def __init__(self, pair_indices, reference_traj, periodic=False):
+    def __init__(self, pair_indices, periodic=False):
         self.pair_indices = pair_indices
-        self.reference_traj = reference_traj
         self.n_features = len(self.pair_indices)
         self.periodic = periodic
 

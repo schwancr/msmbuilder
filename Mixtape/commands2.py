@@ -38,6 +38,10 @@ from mixtape.featurizer import (ContactFeaturizer, DihedralFeaturizer,
                                 AtomPairsFeaturizer, SuperposeFeaturizer)
 from mixtape.cmdline import NumpydocClassCommand, argument
 
+#-----------------------------------------------------------------------------
+# Utilities
+#-----------------------------------------------------------------------------
+
 def verbosedump(value, fn, compress=1):
     print('Saving "%s"... (%s)' % (fn, type(value)))
     dump(value, fn, compress=compress)
@@ -52,10 +56,18 @@ def verboseload(fn):
 
 class ContactFeaturizerCommand(NumpydocClassCommand):
     klass = ContactFeaturizer
-    trjs = argument('--trjs', help='Glob pattern for trajectories', default='', nargs='+')
+    trjs = argument('--trjs', help='Glob pattern for trajectories',
+        default='', nargs='+')
     top = argument('--top', help='Path to topology file', default='')
-    chunk = argument('--chunk', help='Iterload chunk', default=10000, type=int)
+    chunk = argument('--chunk', help='''Chunk size for loading trajectories
+        using mdtraj.iterload''', default=10000, type=int)
     out = argument('--out', required=True, help='Output path')
+
+    def _contacts_type(self, val):
+        if val is 'all':
+            return val
+        else:
+            return np.loadtxt(fn, dtype=int, ndmin=2)
 
     def start(self):
         print(self.instance)
@@ -84,10 +96,15 @@ class DihedralFeaturizerCommand(ContactFeaturizerCommand):
 
 class AtomPairsFeaturizerCommand(ContactFeaturizerCommand):
     klass = AtomPairsFeaturizer
+    def _pair_indices_type(self, fn):
+        return np.loadtxt(fn, dtype=int, ndmin=2)
 
 class SuperposeFeaturizerCommand(ContactFeaturizerCommand):
     klass = SuperposeFeaturizer
-
+    def _reference_traj_type(self, fn):
+        return md.load(fn)
+    def _atom_indices_type(self, fn):
+        return np.loadtxt(fn, dtype=int, ndmin=1)
 
 #-----------------------------------------------------------------------------
 # partial_fit() on each sequence and then transform() on each sequence
@@ -95,9 +112,15 @@ class SuperposeFeaturizerCommand(ContactFeaturizerCommand):
 
 class tICACommand(NumpydocClassCommand):
     klass = tICA
-    inp = argument('--inp', help='Input dataset', required=True)
-    out = argument('--out', help='Output (fit) model', default='')
-    transformed = argument('--transformed', help='Output (transformed) dataset', default='')
+    inp = argument('--inp', help='''Input dataset. This should be serialized
+        list of numpy arrays.''', required=True)
+    out = argument('--out', help='''Output (fit) model. This will be a
+        serialized instance of the fit model object (optional).''',
+        default='')
+    transformed = argument('--transformed', help='''Output (transformed)
+        dataset. This will be a serialized list of numpy arrays,
+        corresponding to each array in the input data set after the
+        applied transformation (optional).''', default='')
 
     def start(self):
         print(self.instance)
@@ -135,8 +158,10 @@ class SparseTICACommand(tICACommand):
 
 class GaussianFusionHMMCommand(NumpydocClassCommand):
     klass = GaussianFusionHMM
-    inp = argument('--inp', help='Input dataset', required=True)
-    model = argument('--out', help='Output model', required=True)
+    inp = argument('--inp', help='''Input dataset. This should be serialized
+        list of numpy arrays.''', required=True)
+    model = argument('--out', help='''Output (fit) model. This will be a
+        serialized instance of the fit model object.''', required=True)
 
     def start(self):
         print(self.instance)
@@ -159,9 +184,13 @@ class GaussianFusionHMMCommand(NumpydocClassCommand):
 
 class KMeansCommand(NumpydocClassCommand):
     klass = KMeans
-    inp = argument('--inp', help='Input dataset', required=True)
-    out = argument('--out', help='Output (fit) model', default='')
-    labels = argument('--labels', help='Output (transformed) dataset', default='')
+    inp = argument('--inp', help='''Input dataset. This should be serialized
+        list of numpy arrays.''', required=True)
+    out = argument('--out', help='''Output (fit) model. This will be a
+        serialized instance of the fit model object. (optional)''', default='')
+    labels = argument('--labels', help='''Output (transformed) dataset.
+        This will be a serialized list of 1D numpy arrays with the cluster
+        labels of each data point in the input dataset. (optional)''', default='')
 
     def start(self):
         print(self.instance)
