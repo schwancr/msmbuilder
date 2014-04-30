@@ -7,9 +7,14 @@ from mixtape.commands2 import *
 
 class MixtapeApp(App):
     def _subcommands(self):
+        cmds = []
         for e in super(MixtapeApp, self)._subcommands():
             if issubclass(e, NumpydocClassCommand):
-                yield e
+                cmds.append(e)
+
+        # sort the commands in some order.
+        # return sorted(cmds, key=lambda e : e.klass.__module__ + e.klass.__name__)
+        return sorted(cmds, key=lambda e : e.mro())
 
 
 app = MixtapeApp(name='mixtape', description=__doc__)
