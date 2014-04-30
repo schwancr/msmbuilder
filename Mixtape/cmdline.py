@@ -206,26 +206,65 @@ class Command(with_metaclass(abc.ABCMeta, object)):
 
 class NumpydocClassCommand(Command):
     """Subclass of Command that automatically populates arguments from
-    the __init__ signature of a klass
+    the __init__ signature of a klass. klass must be a class whose
+    class docstring is in the numpy format, including a "Parameters" section
+    which gives the docstrings for the class's __init__ method. This will
+    be parsed to create the argparse code for this command.
+
+    When the class gets chosen on the command line executed, it's `start()`
+    method will get called.
+
+    Example
+    -------
+    >>> class HMMCommand(NumpydocClassCommand)
+    >>>    klass = HMM
+    >>>
+    >>>    def start(self):
+    >>>        print self.instance
+
     """
+
+    # subclasses should override this
     klass = None
 
     def __init__(self, args):
-        init_args = inspect.getargspec(self.klass.__init__)[0]
-        kwargs = {k:v for k, v in args.__dict__.items() if k in init_args}
+        # create the instance of `klass`
 
-        # set all of the args as attributes on the class
+        init_args = inspect.getargspec(self.klass.__init__)[0]
+        kwargs = {}
+
         for k, v in args.__dict__.items():
-            setattr(self, k, v)
+            # these are all of the specified options from the command line
+            # some of them correspond to __init__ args for self.klass, and
+            # others are "extra" arguments that wern't part of klass
+
+            if k in init_args:
+                # put the ones for klass.__init__ in a dict
+                kwags[k] = v
+            else:
+                # set the others as attributes on self
+                setattr(self, k, v)
+
+        # make an instantiation of `klass`, populated with the requested
+        # arguments from the command line
         self.instance = self.klass(**kwargs)
 
     @classmethod
     def _get_name(cls):
-        return cls.klass.__name__.lower()
+        # the default name of the subcommand will just be the name of the class
+        return cls.klass.__name__
 
     @classmethod
     def _register_arguments(cls, subparser):
+        """this is a special method that gets called to construct the argparse
+        parser. it uses the python inspect module to introspect the __init__ method
+        of `klass`, and add an argument for each parameter. it also uses numpydoc
+        to read the class docstring of klass (which is supposed to be in numpydoc
+        format) to get the help-text and type for each argument, as well as a
+        description of the class."""
+
         assert cls.klass is not None
+
         # inspect __init__
         try:
             args, varargs, keywords, defaults = inspect.getargspec(cls.klass.__init__)
@@ -233,9 +272,14 @@ class NumpydocClassCommand(Command):
             args = []
 
         doc = numpydoc.docscrape.ClassDoc(cls.klass)
+        # mapping from the name of the argument to the helptext
         helptext = {d[0]: ' '.join(d[2]) for d in doc['Parameters']}
+
+        # mapping from the name of the argument to the type
         typemap = {d[0]: d[1].replace(',', ' ').split(' ')[0] for d in doc['Parameters']}
 
+        # put all of these arguments into an argument group, to separate them
+        # from other arguments on the subcommand
         group = argument_group('instance arguments')
 
         for i, arg in enumerate(args):
@@ -250,7 +294,11 @@ class NumpydocClassCommand(Command):
                 kwargs['required'] = True
 
             if arg in helptext:
+                # try to get some helptext
                 kwargs['help'] = helptext[arg]
+
+            # obviously this isn't an exaustive list, but try to make
+            # reasonable argparse decisions based on the docstring.
             if arg in typemap and typemap[arg] == 'list':
                 kwargs['nargs'] = '+'
             if arg in typemap and typemap[arg] == 'bool':
@@ -290,10 +338,12 @@ class App(object):
         name = getattr(self.args, self.subcommand_dest)
         exclude = [self.subcommand_dest]
 
+        # figure out which command the user invoked
         klass = [k for k in self._subcommands() if k._get_name() == name][0]
         dct = ((k, v) for k, v in self.args.__dict__.items() if k not in exclude)
         args = argparse.Namespace(**dict(dct))
         instance = klass(args)
+        # and then call start() on it
         instance.start()
         return instance
 
@@ -331,6 +381,8 @@ class App(object):
     @classmethod
     def _subcommands(cls):
         for subclass in all_subclasses(Command):
+            # we don't want the raw "Command" or "NumydocClassCommand" to appear
+            # in the list of subcommands.
             if subclass not in [cls, NumpydocClassCommand]:
                 yield subclass
 
