@@ -25,7 +25,7 @@ import numpy as np
 from six import string_types, PY2
 from scipy.spatial.distance import cdist
 from sklearn.utils import check_random_state
-from sklearn.base import BaseEstimator, ClusterMixin
+from sklearn.base import BaseEstimator, ClusterMixin, TransformerMixin
 from sklearn.cluster.k_means_ import _squared_norms, _labels_inertia
 
 from mixtape.cluster import MultiSequenceClusterMixin
@@ -36,7 +36,7 @@ __all__ = ['KCenters']
 # Code
 #-----------------------------------------------------------------------------
 
-class _KCenters(BaseEstimator, ClusterMixin):
+class _KCenters(BaseEstimator, ClusterMixin, TransformerMixin):
     """K-Centers clustering
 
     Parameters
@@ -88,9 +88,10 @@ class _KCenters(BaseEstimator, ClusterMixin):
         Distance from each sample to the cluster center it is
         assigned to.
     """
-    def __init__(self, n_clusters=8, metric='euclidean', random_state=0):
+    def __init__(self, n_clusters=8, metric='euclidean', random_state=None):
         self.n_clusters = n_clusters
         self.metric = metric
+        self.random_state = random_state
         self.random = check_random_state(random_state)
 
     def fit(self, X, y=None):

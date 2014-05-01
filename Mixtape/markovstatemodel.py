@@ -183,12 +183,12 @@ class MarkovStateModel(BaseEstimator):
         return timescales
 
     def score(self, sequences, y=None):
-        V = self.eigenpairs_[1]
+        u, V = self.eigenpairs_
 
         m2 = self.__class__(n_states=self.n_states, n_timescales=self.n_timescales,
                             lag_time=self.lag_time,
                             reversible_type=self.reversible_type,
                             ergodic_trim=self.ergodic_trim)
         m2.fit(sequences)
-        R = V.T.dot(m2.transmat_.dot(V))
-        return np.trace(R)
+
+        return np.trace(V.T.dot(m2.transmat_.dot(V)).dot(np.linalg.pinv(V.T.dot(V))))
