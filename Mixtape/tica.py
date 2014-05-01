@@ -46,9 +46,9 @@ class tICA(BaseEstimator, TransformerMixin):
     ----------
     n_components : int, None
         Number of components to keep.
-    offset : int
+    lag_time : int
         Delay time forward or backward in the input data. The time-lagged
-        correlations is computed between datas X[t] and X[t+offset].
+        correlations is computed between datas X[t] and X[t+lag_time].
     gamma : nonnegative float, default=0.05
         Regularization strength. Positive `gamma` entails incrementing
         the sample covariance matrix by a constant times the identity,
@@ -73,7 +73,7 @@ class tICA(BaseEstimator, TransformerMixin):
         give a set of "directions" through configuration space along
         which the system relaxes towards equilibrium. Each eigenvector
         is associated with characteritic timescale
-        :math:`- \frac{offset}/{ln \lambda_i}, where :math:`lambda_i` is
+        :math:`- \frac{lag_time}{ln \lambda_i}, where :math:`lambda_i` is
         the corresponding eigenvector. See [2] for more information.
     means_ : array, shape (n_features,)
         The mean of the data along each feature
@@ -106,9 +106,9 @@ class tICA(BaseEstimator, TransformerMixin):
     (1994): 3634.
     """
 
-    def __init__(self, n_components=None, offset=1, gamma=0.05):
+    def __init__(self, n_components=None, lag_time=1, gamma=0.05):
         self.n_components = n_components
-        self.offset = offset
+        self.lag_time = lag_time
         self.gamma = gamma
 
         self.n_features = None
@@ -117,18 +117,18 @@ class tICA(BaseEstimator, TransformerMixin):
 
         self._initialized = False
 
-        # X[:-self.offset].T dot X[self.offset:]
+        # X[:-self.lag_time].T dot X[self.lag_time:]
         self._outer_0_to_T_lagged = None
-        # X[:-self.offset].sum(axis=0)
-        self._sum_0_to_TminusOffset = None
-        # X[self.offset:].sum(axis=0)
+        # X[:-self.lag_time].sum(axis=0)
+        self._sum_0_to_TminusTau = None
+        # X[self.lag_time:].sum(axis=0)
         self._sum_tau_to_T = None
-        # X[self.offset:].sum(axis=0)
+        # X[:].sum(axis=0)
         self._sum_0_to_T = None
 
-        # X[:-self.offset].T dot X[:-self.offset])
-        self._outer_0_to_TminusOffset = None
-        # X[self.offset:].T dot X[self.offset:]
+        # X[:-self.lag_time].T dot X[:-self.lag_time])
+        self._outer_0_to_TminusTau = None
+        # X[self.lag_time:].T dot X[self.lag_time:]
         self._outer_offset_to_T = None
 
         # the tICs themselves
@@ -152,10 +152,10 @@ class tICA(BaseEstimator, TransformerMixin):
         self.n_observations_ = 0
         self.n_sequences_ = 0
         self._outer_0_to_T_lagged = np.zeros((n_features, n_features))
-        self._sum_0_to_TminusOffset = np.zeros(n_features)
+        self._sum_0_to_TminusTau = np.zeros(n_features)
         self._sum_tau_to_T = np.zeros(n_features)
         self._sum_0_to_T = np.zeros(n_features)
-        self._outer_0_to_TminusOffset = np.zeros((n_features, n_features))
+        self._outer_0_to_TminusTau = np.zeros((n_features, n_features))
         self._outer_offset_to_T = np.zeros((n_features, n_features))
         self._initialized = True
 
@@ -199,13 +199,13 @@ class tICA(BaseEstimator, TransformerMixin):
 
     @property
     def means_(self):
-        two_N = 2 * (self.n_observations_ - self.offset * self.n_sequences_)
-        means = (self._sum_0_to_TminusOffset + self._sum_tau_to_T) / float(two_N)
+        two_N = 2 * (self.n_observations_ - self.lag_time * self.n_sequences_)
+        means = (self._sum_0_to_TminusTau + self._sum_tau_to_T) / float(two_N)
         return means
 
     @property
     def offset_correlation_(self):
-        two_N = 2 * (self.n_observations_ - self.offset * self.n_sequences_)
+        two_N = 2 * (self.n_observations_ - self.lag_time * self.n_sequences_)
         term = (self._outer_0_to_T_lagged + self._outer_0_to_T_lagged.T) / two_N
 
         means = self.means_
@@ -213,8 +213,8 @@ class tICA(BaseEstimator, TransformerMixin):
 
     @property
     def covariance_(self):
-        two_N = 2 * (self.n_observations_ - self.offset * self.n_sequences_)
-        term = (self._outer_0_to_TminusOffset + self._outer_offset_to_T) / two_N
+        two_N = 2 * (self.n_observations_ - self.lag_time * self.n_sequences_)
+        term = (self._outer_0_to_TminusTau + self._outer_offset_to_T) / two_N
 
         means = self.means_
         return term - np.outer(means, means)
@@ -314,19 +314,19 @@ class tICA(BaseEstimator, TransformerMixin):
     def _fit(self, X):
         X = np.asarray(array2d(X), dtype=np.float64)
         self._initialize(X.shape[1])
-        if not len(X) > self.offset:
+        if not len(X) > self.lag_time:
             raise ValueError('First dimension must be longer than '
-                'offset=%d. X has shape (%d, %d)' % ((self.offset,) + X.shape))
+                'lag_time=%d. X has shape (%d, %d)' % ((self.lag_time,) + X.shape))
 
         self.n_observations_ += X.shape[0]
         self.n_sequences_ += 1
 
-        self._outer_0_to_T_lagged += np.dot(X[:-self.offset].T, X[self.offset:])
-        self._sum_0_to_TminusOffset += X[:-self.offset].sum(axis=0)
-        self._sum_tau_to_T += X[self.offset:].sum(axis=0)
+        self._outer_0_to_T_lagged += np.dot(X[:-self.lag_time].T, X[self.lag_time:])
+        self._sum_0_to_TminusTau += X[:-self.lag_time].sum(axis=0)
+        self._sum_tau_to_T += X[self.lag_time:].sum(axis=0)
         self._sum_0_to_T += X.sum(axis=0)
-        self._outer_0_to_TminusOffset += np.dot(X[:-self.offset].T, X[:-self.offset])
-        self._outer_offset_to_T += np.dot(X[self.offset:].T, X[self.offset:])
+        self._outer_0_to_TminusTau += np.dot(X[:-self.lag_time].T, X[:-self.lag_time])
+        self._outer_offset_to_T += np.dot(X[self.lag_time:].T, X[self.lag_time:])
 
         self._is_dirty = True
 
@@ -345,7 +345,7 @@ class tICA(BaseEstimator, TransformerMixin):
         assert self._initialized
         V = self.eigenvectors_
 
-        m2 = self.__class__(offset=self.offset)
+        m2 = self.__class__(lag_time=self.lag_time)
         for X in sequences:
             m2.partial_fit(X)
 
