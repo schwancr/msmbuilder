@@ -168,12 +168,16 @@ class MarkovStateModel(BaseEstimator):
     @property
     def eigenpairs_(self):
         from msmbuilder.msm_analysis import get_reversible_eigenvectors, get_eigenvectors
-
         n_eigenpairs = self.n_timescales + 1 if self.n_timescales is not None else self.transmat_.shape[0] - 2
 
-        if self.reversible_type in ['mle', 'MLE', 'transpose', 'Transpose'] and self.transmat_.shape[0] > 50:
-            return get_reversible_eigenvectors(self.transmat_, n_eigenpairs, populations=self.populations_)
-        return get_eigenvectors(self.transmat_, n_eigenpairs, epsilon=1)
+        if (self.reversible_type in ['mle', 'MLE', 'transpose', 'Transpose']) and \
+           (self.transmat_.shape[0] > 50) and \
+           scipy.sparse.isspmatrix(self.transmat_):
+
+            return get_reversible_eigenvectors(self.transmat_, n_eigenpairs,
+                                               populations=self.populations_, right=False)
+
+        return get_eigenvectors(self.transmat_, n_eigenpairs, epsilon=1, right=False)
 
     @property
     def timescales_(self):
@@ -183,7 +187,7 @@ class MarkovStateModel(BaseEstimator):
         return timescales
 
     def score(self, sequences, y=None):
-        u, V = self.eigenpairs_
+        u, V = self.eigenpairs_  # left eigenvectors
 
         m2 = self.__class__(n_states=self.n_states, n_timescales=self.n_timescales,
                             lag_time=self.lag_time,
@@ -191,4 +195,23 @@ class MarkovStateModel(BaseEstimator):
                             ergodic_trim=self.ergodic_trim)
         m2.fit(sequences)
 
-        return np.trace(V.T.dot(m2.transmat_.dot(V)).dot(np.linalg.pinv(V.T.dot(V))))
+        if self.mapping_ != m2.mapping_:
+            Vmapped = np.zeros((len(m2.mapping_), V.shape[1]))
+            for k, v in m2.mapping_.items():
+                if k in self.mapping_:
+                    Vmapped[v] = V[self.mapping_[k]]
+
+            V = Vmapped
+
+        right = V / V[:, 0:1]
+
+        try:
+            trace = np.trace(V.T.dot(m2.transmat_.dot(right)).dot(np.linalg.pinv(V.T.dot(right))))
+            if trace > V.shape[1]:
+                raise RuntimeError("Math says that this should not happen...")
+
+        except np.linalg.LinAlgError:
+            trace = np.nan
+
+        print(self.n_states, self.transmat_.shape[0], trace)
+        return trace
