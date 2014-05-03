@@ -26,8 +26,9 @@ import numpy as np
 from sklearn import cluster
 from sklearn import mixture
 
-__all__ = ['KMeans', 'MiniBatchKMeans', 'AffinityPropagation', 'MeanShift', 'GMM',
-           'SpectralClustering', 'Ward', 'KCenters', 'MultiSequenceClusterMixin']
+__all__ = ['KMeans', 'MiniBatchKMeans', 'AffinityPropagation', 'MeanShift',
+           'GMM', 'SpectralClustering', 'Ward', 'KCenters', 'NDGrid',
+           'MultiSequenceClusterMixin']
 
 #-----------------------------------------------------------------------------
 # Code
@@ -199,3 +200,4 @@ class GMM(MultiSequenceClusterMixin, mixture.GMM):
 # This needs to come _after_ MultiSequenceClusterMixin is defined, to avoid
 # recursive circular imports
 from .kcenters import KCenters
+from .ndgrid import NDGrid
