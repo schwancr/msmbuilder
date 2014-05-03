@@ -113,6 +113,8 @@ class MarkovStateModel(BaseEstimator):
         if self.n_states is None:
             self.n_states = np.max([np.max(x) for x in sequences]) + 1
 
+        from msmbuilder import MSMLib
+        MSMLib.logger.info = lambda *args : None
         from msmbuilder.msm_analysis import get_eigenvectors
         from msmbuilder.MSMLib import mle_reversible_count_matrix, estimate_transition_matrix, ergodic_trim
 

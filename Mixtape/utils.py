@@ -23,6 +23,7 @@
 from __future__ import print_function, division, absolute_import
 
 import json
+import hashlib
 import numpy as np
 from sklearn.utils import check_random_state
 from numpy.linalg import norm
@@ -30,6 +31,14 @@ from numpy.linalg import norm
 #-----------------------------------------------------------------------------
 # Code
 #-----------------------------------------------------------------------------
+
+def sha1digest(filename):
+    """SHA1 hex digest of a file
+    """
+    sha1 = hashlib.sha1()
+    with open(filename, 'rb') as f:
+        sha1.update(f.read())
+    return sha1.hexdigest()
 
 
 def iterobjects(fn):
