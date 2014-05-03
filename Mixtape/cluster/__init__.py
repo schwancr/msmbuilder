@@ -64,8 +64,8 @@ class MultiSequenceClusterMixin(object):
         s = super(MultiSequenceClusterMixin, self) if PY2 else super()
         s.fit(self._concat(sequences))
 
-        if hasattr(s, 'labels_'):
-           self.labels_ = self._split(s.labels_)
+        if hasattr(self, 'labels_'):
+            self.labels_ = self._split(self.labels_)
 
         return self
 

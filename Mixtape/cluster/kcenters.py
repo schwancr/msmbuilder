@@ -26,7 +26,6 @@ from six import string_types, PY2
 from scipy.spatial.distance import cdist
 from sklearn.utils import check_random_state
 from sklearn.base import BaseEstimator, ClusterMixin, TransformerMixin
-from sklearn.cluster.k_means_ import _squared_norms, _labels_inertia
 
 from mixtape.cluster import MultiSequenceClusterMixin
 
@@ -118,7 +117,6 @@ class _KCenters(BaseEstimator, ClusterMixin, TransformerMixin):
             self.distances_[mask] = d[mask]
             self.labels_[mask] = i
             self.cluster_centers_[i] = X[new_center_index]
-
             new_center_index = np.argmax(self.distances_)
 
         return self
@@ -141,9 +139,6 @@ class _KCenters(BaseEstimator, ClusterMixin, TransformerMixin):
             Index of the closest center each sample belongs to.
         """
         metric_function = self._metric_function
-        if self.metric == 'euclidean':
-            x_squared_norms = _squared_norms(X)
-            return _labels_inertia(X, x_squared_norms, self.cluster_centers_)[0]
 
         labels = np.zeros(len(X), dtype=int)
         distances = np.empty(len(X), dtype=float)
@@ -166,8 +161,8 @@ class _KCenters(BaseEstimator, ClusterMixin, TransformerMixin):
             # distance from r[i] to each frame in t (output is a vector of length len(t)
             # using scipy.spatial.distance.cdist
             return lambda t, r, i : cdist(t, r[i, np.newaxis], metric=self.metric)[:,0]
-        elif callable(metric):
-            return metric
+        elif callable(self.metric):
+            return self.metric
         raise NotImplementedError
 
 
@@ -207,3 +202,4 @@ class KCenters(MultiSequenceClusterMixin, _KCenters):
         MultiSequenceClusterMixin.fit(self, sequences)
         self.distances_ = self._split(self.distances_)
         return self
+

@@ -110,6 +110,7 @@ class MarkovStateModel(BaseEstimator):
         -------
         self
         """
+        print('fit sequences', sequences)
         if self.n_states is None:
             self.n_states = np.max([np.max(x) for x in sequences]) + 1
 
@@ -166,52 +167,48 @@ class MarkovStateModel(BaseEstimator):
         return counts
 
     @property
-    def eigenpairs_(self):
-        from msmbuilder.msm_analysis import get_reversible_eigenvectors, get_eigenvectors
-        n_eigenpairs = self.n_timescales + 1 if self.n_timescales is not None else self.transmat_.shape[0] - 2
-
-        if (self.reversible_type in ['mle', 'MLE', 'transpose', 'Transpose']) and \
-           (self.transmat_.shape[0] > 50) and \
-           scipy.sparse.isspmatrix(self.transmat_):
-
-            return get_reversible_eigenvectors(self.transmat_, n_eigenpairs,
-                                               populations=self.populations_, right=False)
-
-        return get_eigenvectors(self.transmat_, n_eigenpairs, epsilon=1, right=False)
-
-    @property
     def timescales_(self):
+        u, v = scipy.sparse.linalg.eigs(self.transmat_, k=self.n_timescales + 1)
+        order = np.argsort(-np.real(u))
+        u = np.real_if_close(u[order])
+
         # make sure to leave off equilibrium distribution
-        e_values = self.eigenpairs_[0]
-        timescales = -1 / np.log(e_values[1:])
+        timescales = -lag_time / np.log(u[1:])
         return timescales
 
     def score(self, sequences, y=None):
-        u, V = self.eigenpairs_  # left eigenvectors
+        print('score sequences', sequences)
+        u, V = scipy.sparse.linalg.eigs(self.transmat_, k=self.n_timescales + 1)
+        order = np.argsort(-np.real(u))
+        u = np.real_if_close(u[order])
+        V = np.real_if_close(V[:, order])
 
-        m2 = self.__class__(n_states=self.n_states, n_timescales=self.n_timescales,
-                            lag_time=self.lag_time,
-                            reversible_type=self.reversible_type,
-                            ergodic_trim=self.ergodic_trim)
+        m2 = self.__class__(
+            n_states=self.n_states, n_timescales=self.n_timescales,
+            lag_time=self.lag_time, reversible_type=self.reversible_type,
+            ergodic_trim=self.ergodic_trim)
         m2.fit(sequences)
 
+        '''
         if self.mapping_ != m2.mapping_:
+            # if states are trimmed out, there is potentially some ambiguity in
+            # how to "map" the eigenvectors from one state decomposition to
+            # another.
             Vmapped = np.zeros((len(m2.mapping_), V.shape[1]))
             for k, v in m2.mapping_.items():
                 if k in self.mapping_:
                     Vmapped[v] = V[self.mapping_[k]]
 
             V = Vmapped
+        '''
+        print('transmat identical\n', self.transmat_.todense() - m2.transmat_.todense())
 
-        right = V / V[:, 0:1]
-
+        S = scipy.sparse.diags(m2.populations_, offsets=0).tocsr()
+        C = S.dot(m2.transmat_)
+        
         try:
-            trace = np.trace(V.T.dot(m2.transmat_.dot(right)).dot(np.linalg.pinv(V.T.dot(right))))
-            if trace > V.shape[1]:
-                raise RuntimeError("Math says that this should not happen...")
-
+            trace = np.trace(V.T.dot(C.dot(V)).dot(np.linalg.inv(V.T.dot(S.dot(V)))))
         except np.linalg.LinAlgError:
             trace = np.nan
 
-        print(self.n_states, self.transmat_.shape[0], trace)
         return trace
