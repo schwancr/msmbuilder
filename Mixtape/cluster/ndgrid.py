@@ -59,16 +59,19 @@ class _NDGrid(BaseEstimator, ClusterMixin, TransformerMixin):
     ----------
     n_features : int
         Number of features
+    n_bins : int
+        The total number of bins
     grid : np.ndarray, shape=[n_features, n_bins_per_feature+1]
         Bin edges
     """
 
-    def __init__(self, n_bins_per_feature, min=None, max=None):
+    def __init__(self, n_bins_per_feature=2, min=None, max=None):
         self.n_bins_per_feature = n_bins_per_feature
         self.min = min
         self.max = max
         # unknown until we have the number of features
         self.n_features = None
+        self.n_bins = None
         self.grid = None
 
     def fit(self, X, y=None):
@@ -85,6 +88,7 @@ class _NDGrid(BaseEstimator, ClusterMixin, TransformerMixin):
         """
         X = array2d(X)
         self.n_features = X.shape[1]
+        self.n_bins = self.n_bins_per_feature**self.n_features
 
         if self.min is None:
             min = np.min(X, axis=0)
@@ -128,10 +132,8 @@ class _NDGrid(BaseEstimator, ClusterMixin, TransformerMixin):
         for i in range(self.n_features):
             binassign[i] = np.digitize(X[:, i], self.grid[i]) - 1
         labels = np.dot(self.n_features**np.arange(self.n_features), binassign)
-        print(labels)
-        print(X)
-        print(self.grid)
-        assert np.max(labels) < self.n_bins_per_feature**self.n_features
+
+        assert np.max(labels) < self.n_bins
         return labels
 
     def fit_predict(self, X, y=None):

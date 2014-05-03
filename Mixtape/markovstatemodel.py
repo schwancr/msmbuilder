@@ -174,7 +174,7 @@ class MarkovStateModel(BaseEstimator):
         u = np.real_if_close(u[order])
 
         # make sure to leave off equilibrium distribution
-        timescales = -lag_time / np.log(u[1:])
+        timescales = - self.lag_time / np.log(u[1:])
         return timescales
 
     def score(self, sequences, y=None):
