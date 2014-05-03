@@ -110,7 +110,6 @@ class MarkovStateModel(BaseEstimator):
         -------
         self
         """
-        print('fit sequences', sequences)
         if self.n_states is None:
             self.n_states = np.max([np.max(x) for x in sequences]) + 1
 
@@ -177,7 +176,6 @@ class MarkovStateModel(BaseEstimator):
         return timescales
 
     def score(self, sequences, y=None):
-        print('score sequences', sequences)
         u, V = scipy.sparse.linalg.eigs(self.transmat_, k=self.n_timescales + 1)
         order = np.argsort(-np.real(u))
         u = np.real_if_close(u[order])
@@ -189,7 +187,6 @@ class MarkovStateModel(BaseEstimator):
             ergodic_trim=self.ergodic_trim)
         m2.fit(sequences)
 
-        '''
         if self.mapping_ != m2.mapping_:
             # if states are trimmed out, there is potentially some ambiguity in
             # how to "map" the eigenvectors from one state decomposition to
@@ -200,8 +197,6 @@ class MarkovStateModel(BaseEstimator):
                     Vmapped[v] = V[self.mapping_[k]]
 
             V = Vmapped
-        '''
-        print('transmat identical\n', self.transmat_.todense() - m2.transmat_.todense())
 
         S = scipy.sparse.diags(m2.populations_, offsets=0).tocsr()
         C = S.dot(m2.transmat_)
