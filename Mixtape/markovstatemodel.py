@@ -85,12 +85,14 @@ class MarkovStateModel(BaseEstimator):
         The equilibrium population (stationary eigenvector) of transmat_
     """
 
-    def __init__(self, n_states=None, n_timescales=None, lag_time=1, reversible_type='mle', ergodic_trim=True):
+    def __init__(self, n_states=None, n_timescales=None, lag_time=1, reversible_type='mle', ergodic_trim=True,
+                 prior_counts=0):
         self.n_states = n_states
         self.reversible_type = reversible_type
         self.ergodic_trim = ergodic_trim
         self.lag_time = lag_time
         self.n_timescales = n_timescales
+        self.prior_counts = prior_counts
 
         available_reversible_type = ['mle', 'MLE', 'transpose', 'Transpose', None]
         if self.reversible_type not in available_reversible_type:
@@ -119,6 +121,8 @@ class MarkovStateModel(BaseEstimator):
         from msmbuilder.MSMLib import mle_reversible_count_matrix, estimate_transition_matrix, ergodic_trim
 
         self.rawcounts_ = self._count_transitions(sequences)
+        if self.prior_counts > 0:
+            self.rawcounts_ = scipy.sparse.csr_matrix(self.rawcounts_.todense() + self.prior_counts)
 
         # STEP (1): Ergodic trimming
         if self.ergodic_trim:
