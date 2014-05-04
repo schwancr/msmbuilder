@@ -56,6 +56,14 @@ class MarkovStateModel(BaseEstimator):
         Trim states to achieve an ergodic model. The model is restricted
         to the largest strongly connected component in the undirected
         transition counts.
+    prior_counts : float, optional
+        Add a number of "pseudo counts" to each entry in the counts matrix,
+        `rawcounts_`. When prior_counts == 0 (default), the assigned transition
+        probability between two states with no observed transitions will be zero,
+        whereas when prior_counts > 0, even this unobserved transitions will be
+        given nonzero probability. Note that prior_counts _totally_ destroys
+        performance when the number of states is large, because none of the
+        matrices are sparse anymore.
 
     Attributes
     ----------
@@ -85,8 +93,8 @@ class MarkovStateModel(BaseEstimator):
         The equilibrium population (stationary eigenvector) of transmat_
     """
 
-    def __init__(self, n_states=None, n_timescales=None, lag_time=1, reversible_type='mle', ergodic_trim=True,
-                 prior_counts=0):
+    def __init__(self, n_states=None, n_timescales=None, lag_time=1,
+                 reversible_type='mle', ergodic_trim=True, prior_counts=0):
         self.n_states = n_states
         self.reversible_type = reversible_type
         self.ergodic_trim = ergodic_trim
