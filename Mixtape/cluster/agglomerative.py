@@ -82,9 +82,9 @@ def cdist(XA, XB, metric='euclidean'):
 
 
 class _LandmarkAgglomerative(BaseEstimator, ClusterMixin, TransformerMixin):
-    """
+    """Landmark-based agglomerative hierarchical clustering
     
-   Parameters
+    Parameters
     ----------
     n_clusters : int
         The number of clusters to find.
@@ -122,9 +122,9 @@ class _LandmarkAgglomerative(BaseEstimator, ClusterMixin, TransformerMixin):
         is not None. "stride" takes landmarks every n-th data point in X, and
         random selects them randomly.
     random_state : integer or numpy.RandomState, optional
-        The generator used to initialize the centers. If an integer is
-        given, it fixes the seed. Defaults to the global numpy random
-        number generator.
+        The generator used to select random landmarks. Only used if
+        landmark_strategy=='random'. If an integer is given, it fixes the seed.
+        Defaults to the global numpy random number generator.
 
     Attributes
     ----------
