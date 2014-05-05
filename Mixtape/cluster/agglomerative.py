@@ -57,23 +57,23 @@ POOLING_FUNCTIONS = {
 def pdist(X, metric='euclidean'):
     if isinstance(metric, six.string_types):
         return scipy.spatial.distance.pdist(X, metric)
-    else:
-        n = len(X)
-        d = np.empty((n, n))
-        for i in range(n):
-            d[i, :] = metric(X, X, i)
-        return d
+
+    n = len(X)
+    d = np.empty((n, n))
+    for i in range(n):
+        d[i, :] = metric(X, X, i)
+    return d
 
 
 def cdist(XA, XB, metric='euclidean'):
     if isinstance(metric, six.string_types):
         return scipy.spatial.distance.cdist(XA, XB, metric)
-    else:
-        nA, nB = len(XA), len(XB)
-        d = np.empty((nA, nB))
-        for i in range(nA):
-            d[i, :] = metric(XB, XA, i)
-        return d
+
+    nA, nB = len(XA), len(XB)
+    d = np.empty((nA, nB))
+    for i in range(nA):
+        d[i, :] = metric(XB, XA, i)
+    return d
 
 
 #-----------------------------------------------------------------------------
