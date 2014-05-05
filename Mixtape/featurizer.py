@@ -1,5 +1,6 @@
 # Author: Kyle A. Beauchamp <kyleabeauchamp@gmail.com>
-# Contributors: Robert McGibbon <rmcgibbo@gmail.com>
+# Contributors: Robert McGibbon <rmcgibbo@gmail.com>,
+#               Matthew Harrigan <matthew.p.harrigan@gmail.com>
 # Copyright (c) 2014, Stanford University and the Authors
 # All rights reserved.
 #
@@ -228,6 +229,65 @@ class ContactFeaturizer(Featurizer):
         return distances
 
 
+class GaussianSolventFeaturizer(Featurizer):
+    """Featurizer on weighted pairwise distance between solute and solvent.
+
+    We apply a Gaussian kernel to each solute-solvent pairwise distance
+    and sum the kernels for each solute atom, resulting in a vector
+    of len(solute_indices).
+
+    The values can be physically interpreted as the degree of solvation
+    of each solute atom.
+
+    Parameters
+    ----------
+    solute_indices : np.ndarray, shape=(n_solute,1)
+        Indices of solute atoms
+    solvent_indices : np.ndarray, shape=(n_solvent, 1)
+        Indices of solvent atoms
+    sigma : float
+        Sets the length scale for the gaussian kernel
+    periodic : bool
+        Whether to consider a periodic system in distance calculations
+
+    Returns
+    -------
+    fingerprints : np.ndarray, shape=(n_frames, n_solute)
+
+    References
+    ----------
+    ..[1] Gu, Chen, et al. BMC Bioinformatics 14, no. Suppl 2
+    (January 21, 2013): S8. doi:10.1186/1471-2105-14-S2-S8.
+    """
+
+    def __init__(self, solute_indices, solvent_indices, sigma, periodic=False):
+        self.solute_indices = solute_indices[:, 0]
+        self.solvent_indices = solvent_indices[:, 0]
+        self.sigma = sigma
+        self.periodic = periodic
+        self.n_features = len(self.solute_indices)
+
+    def featurize(self, traj):
+        # The result vector
+        fingerprints = np.zeros((traj.n_frames, self.n_features))
+        atom_pairs = np.zeros((len(self.solvent_indices), 2))
+        sigma = self.sigma
+
+        for i, solute_i in enumerate(self.solute_indices):
+            # For each solute atom, calculate distance to all solvent
+            # molecules
+            atom_pairs[:, 0] = solute_i
+            atom_pairs[:, 1] = self.solvent_indices
+
+            distances = md.compute_distances(traj, atom_pairs, periodic=True)
+            distances = np.exp(-distances / (2 * sigma * sigma))
+
+            # Sum over water atoms for all frames
+            fingerprints[:, i] = np.sum(distances, axis=1)
+
+        return fingerprints
+
+
 class RawPositionsFeaturizer(Featurizer):
 
     def __init__(self, n_features):
@@ -235,3 +295,32 @@ class RawPositionsFeaturizer(Featurizer):
 
     def featurize(self, traj):
         return traj.xyz.reshape(len(traj), -1)
+
+
+class RMSDFeaturizer(Featurizer):
+    """Featurizer based on RMSD to a series of reference frames.
+
+    Parameters
+    ----------
+    trj0 : mdtraj.Trajectory
+        Reference trajectory.  trj0.n_frames gives the number of features
+        in this Featurizer.
+    atom_indices : np.ndarray, default=None
+        Which atom indices to use during RMSD calculation.  If None, MDTraj
+        should default to all atoms.
+
+    """
+
+    def __init__(self, trj0, atom_indices=None):
+        self.n_features = trj0.n_frames
+        self.trj0 = trj0
+        self.atom_indices = atom_indices
+
+    def featurize(self, traj):
+        X = np.zeros((traj.n_frames, self.n_features))
+        
+        for frame in range(self.n_features):
+            X[:, frame] = md.rmsd(traj, self.trj0, atom_indices=self.atom_indices, frame=frame)
+        
+        return X
+
