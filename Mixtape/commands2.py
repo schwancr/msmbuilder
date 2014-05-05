@@ -35,7 +35,8 @@ from mixtape.ghmm import GaussianFusionHMM
 from mixtape.sparsetica import SparseTICA
 from mixtape.cluster import KMeans, KCenters
 from mixtape.featurizer import (ContactFeaturizer, DihedralFeaturizer,
-                                AtomPairsFeaturizer, SuperposeFeaturizer)
+                                AtomPairsFeaturizer, SuperposeFeaturizer,
+                                DRIDFeaturizer)
 from mixtape.cmdline import NumpydocClassCommand, argument
 
 #-----------------------------------------------------------------------------
@@ -105,6 +106,13 @@ class SuperposeFeaturizerCommand(ContactFeaturizerCommand):
         return md.load(fn)
     def _atom_indices_type(self, fn):
         return np.loadtxt(fn, dtype=int, ndmin=1)
+
+class DRIDFeaturizerCommand(ContactFeaturizerCommand):
+    klass = DRIDFeaturizer
+    def _atom_indices_type(self, fn):
+        return np.loadtxt(fn, dtype=int, ndmin=1)
+
+
 
 #-----------------------------------------------------------------------------
 # partial_fit() on each sequence and then transform() on each sequence

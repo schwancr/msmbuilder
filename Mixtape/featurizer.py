@@ -25,6 +25,7 @@ from __future__ import print_function, division, absolute_import
 from six.moves import cPickle
 import numpy as np
 import mdtraj as md
+import mdtraj.geometry
 
 #-----------------------------------------------------------------------------
 # Code
@@ -133,7 +134,7 @@ class SuperposeFeaturizer(Featurizer):
 class AtomPairsFeaturizer(Featurizer):
 
     """Featurizer based on atom pair distances.
-    
+
     Parameters
     ----------
     pair_indices : np.ndarray, shape=(n_pairs, 2), dtype=int
@@ -150,7 +151,7 @@ class AtomPairsFeaturizer(Featurizer):
         self.pair_indices = pair_indices
         self.n_features = len(self.pair_indices)
         self.periodic = periodic
-        self.exponent = exponent 
+        self.exponent = exponent
 
     def featurize(self, traj):
         d = md.geometry.compute_distances(traj, self.pair_indices, periodic=self.periodic)
@@ -318,9 +319,25 @@ class RMSDFeaturizer(Featurizer):
 
     def featurize(self, traj):
         X = np.zeros((traj.n_frames, self.n_features))
-        
+
         for frame in range(self.n_features):
             X[:, frame] = md.rmsd(traj, self.trj0, atom_indices=self.atom_indices, frame=frame)
-        
+
         return X
 
+
+class DRIDFeaturizer(Featurizer):
+    """Featurizer based on distribution of reciprocal interatomic
+    distances (DRID)
+
+    Parameters
+    ----------
+    atom_indices : array-like of ints, default=None
+        Which atom indices to use during DRID featurization. If None,
+        all atoms are used
+    """
+    def __init__(self, atom_indices=None):
+        self.atom_indices = atom_indices
+
+    def featurize(self, traj):
+        return mdtraj.geometry.compute_drid(traj, self.atom_indices)
