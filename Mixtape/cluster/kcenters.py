@@ -61,9 +61,8 @@ class _KCenters(BaseEstimator, ClusterMixin, TransformerMixin):
     function. In the interest of performance, the expected call
     signature of a custom metric is
 
-    >>> def mymetric(target_sequence, ref_sequence, ref_index):
-        # return the distance from ref_sequence[ref_index] to each
-        # data point in target_sequence.
+    >>> def mymetric(X, Y, yi):
+        # return the distance from Y[yi] to each point in X.
 
     [Algorithm] KCenters is a simple clustering algorithm. To
     initialize, we select a random data point to be the first
