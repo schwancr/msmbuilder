@@ -28,7 +28,7 @@ from sklearn import mixture
 
 __all__ = ['KMeans', 'MiniBatchKMeans', 'AffinityPropagation', 'MeanShift',
            'GMM', 'SpectralClustering', 'Ward', 'KCenters', 'NDGrid',
-           'MultiSequenceClusterMixin']
+           'LandmarkAgglomerative', 'MultiSequenceClusterMixin']
 
 #-----------------------------------------------------------------------------
 # Code

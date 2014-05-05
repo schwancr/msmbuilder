@@ -63,6 +63,7 @@ class ContactFeaturizerCommand(NumpydocClassCommand):
     chunk = argument('--chunk', help='''Chunk size for loading trajectories
         using mdtraj.iterload''', default=10000, type=int)
     out = argument('--out', required=True, help='Output path')
+    stride = argument('--stride', default=1, type=int, help='Load only every stride-th frame')
 
     def _contacts_type(self, val):
         if val is 'all':
@@ -81,7 +82,7 @@ class ContactFeaturizerCommand(NumpydocClassCommand):
         for item in self.trjs:
             for trjfn in glob.glob(item):
                 trajectory = []
-                for i, chunk in enumerate(md.iterload(trjfn, chunk=self.chunk, top=top)):
+                for i, chunk in enumerate(md.iterload(trjfn, stride=self.stride, chunk=self.chunk, top=top)):
                     print('\r{} chunk {}'.format(os.path.basename(trjfn), i), end='')
                     sys.stdout.flush()
                     trajectory.append(self.instance.featurize(chunk))
