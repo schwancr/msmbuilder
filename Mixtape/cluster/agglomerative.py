@@ -62,7 +62,7 @@ def pdist(X, metric='euclidean'):
     d = np.empty((n, n))
     for i in range(n):
         d[i, :] = metric(X, X, i)
-    return d
+    return scipy.spatial.distance.squareform(d)
 
 
 def cdist(XA, XB, metric='euclidean'):
