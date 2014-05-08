@@ -7,7 +7,7 @@ import numpy as np
 from scipy.stats import sem
 from sklearn.externals.joblib import load, dump
 from sklearn.externals.joblib.logger import short_format_time
- 
+
 from IPython.parallel import Client
 from IPython.display import clear_output
 
@@ -31,7 +31,9 @@ def _fit_and_score_helper(args):
     from sklearn.cross_validation import _fit_and_score
     args = list(args)
     if isinstance(args[1], six.string_types):
-        args[1] = np.asarray(load(args[1], mmap_mode='r'))
+        args[1] = load(args[1], mmap_mode='r')
+        if isinstance(args[1], np.memmap):
+            args[1] = np.asarray(args[1])
     return _fit_and_score(*args)
 
 
@@ -81,7 +83,7 @@ class DistributedBaseSeachCV(BaseSearchCV):
         self.client = client
         self.return_train_scores = return_train_scores
         self.tmp_dir = tmp_dir
-    
+
     def _fit(self, X, y, parameter_iterable):
         """Actual fitting,  performing the search over parameters."""
 
@@ -119,7 +121,10 @@ class DistributedBaseSeachCV(BaseSearchCV):
             clean_me_up = dump(X, tmpfn)
             # Warm up the data to avoid concurrent disk access in
             # multiple children processes
-            load(tmpfn, mmap_mode='r').max()
+            try:
+                load(tmpfn, mmap_mode='r').max()
+            except AttributeError:
+                pass
             Xscatter = tmpfn
         else:
             Xscatter = X

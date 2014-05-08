@@ -27,6 +27,7 @@ import hashlib
 import numpy as np
 from sklearn.utils import check_random_state
 from numpy.linalg import norm
+import mdtraj as md
 
 #-----------------------------------------------------------------------------
 # Code
@@ -50,6 +51,9 @@ def iterobjects(fn):
         except ValueError:
             pass
 
+def rmsd(X, Y, yi):
+    # md.rsmd isn't picklable, so this is a little proxy
+    return md.rmsd(X, Y, yi, precentered=True)
 
 def categorical(pvals, size=None, random_state=None):
     """Return random integer from a categorical distribution
