@@ -1,9 +1,10 @@
-from __future__ import print_function, absolute_import, division
+B0;95;cfrom __future__ import print_function, absolute_import, division
 import sys
 import six
 import time
 import numpy as np
-
+from scipy.stats import sem
+ 
 from IPython.parallel import Client
 from IPython.display import clear_output
 
@@ -19,41 +20,45 @@ except ImportError as e:
     print('This module requires the latest development version (0.15) of sklearn', file=sys.stderr)
     raise e
 
+
 def _fit_and_score_helper(args):
     from sklearn.cross_validation import _fit_and_score
     return _fit_and_score(*args)
 
 
-def _wait_interactive(ar, dt=1):
-    N = len(ar)
-    p = [0 for i in range(N)]
-
-    while not ar.ready():
-        stdouts = ar.stdout
-        if not any(stdouts):
-            continue
-        # clear_output doesn't do much in terminal environments
-        clear_output()
-        print("%4i/%i tasks finished after %4i s" % (ar.progress, N, ar.elapsed), end='')
-        engine_ids = [md['engine_id'] for md in ar._metadata]
-        line_cleared = False
-        for i, (eid, stdout) in enumerate(zip(engine_ids, ar.stdout)):
-            if eid is None:
-                eid = ''
-            new_stdout = stdout[p[i]:]
-            if new_stdout:
-                if not line_cleared:
-                    print()
-                line_cleared = True
-                print("[engine {0}]\n{1}".format(eid, new_stdout))
-                p[i] += len(new_stdout)
+def wait_interactive(async, client, return_train_score, interval=1., timeout=-1):
+    """interactive wait, printing progress at regular intervals"""
+    if timeout is None:
+        timeout = -1
+    N = len(async)
+    tic = time.time()
+    completed = [False for _ in range(N)]
+    while not async.ready() and (timeout < 0 or time.time() - tic <= timeout):
+        async.wait(interval)
+        print("\r%4i/%i tasks finished after %4i s" % (
+                async.progress, N, async.elapsed), end="")
+        times = [(e['received'] - e['started']).total_seconds()
+                 for e in async._metadata if e.status=='ok']
+        if len(times) > 0:
+            print('  (%.3f s +/- %.3f per completed task)' % (
+                    np.mean(times), sem(times)), end="")
         sys.stdout.flush()
-        time.sleep(dt)
 
-    for i, (eid, stdout) in enumerate(zip(ar.engine_id, ar.stdout)):
-        new_stdout = stdout[p[i]:]
-        if new_stdout:
-            print("[engine {0}]\n{1}".format(eid, new_stdout))
+        printed_completion = False
+        for i in range(N):
+            if (not completed[i]) and (async._metadata[i]['status'] == 'ok'):
+                for result in client.get_result(async._metadata[i]['msg_id']).result:
+                    if return_train_score is False:
+                        test_score, _, elapsed, parameters = result
+                    else:
+                        train_score, test_score, _, elapsed, parameters = result
+                    print('\n  Completed: %s (engine=%d) ....... score=%.4f' % (
+                            parameters, async._metadata[i]['engine_id'],
+                            test_score), end='')
+                completed[i] = True
+                printed_completion = True
+        if printed_completion:
+            print()
     print()
 
 
@@ -89,25 +94,28 @@ class DistributedBaseSeachCV(BaseSearchCV):
                                  % (len(y), n_samples))
             y = np.asarray(y)
         cv = check_cv(cv, X, y, classifier=is_classifier(estimator))
-
         base_estimator = clone(self.estimator)
-
+        verbose = self.verbose
         client = self.client
         if not isinstance(client, Client):
             client = Client(client)
 
+        if verbose > 0:
+            print('Fitting %d folds for each of %d candidates, totalling %d fits on %d engines' % (
+                    len(cv), len(parameter_iterable), len(cv)*len(parameter_iterable),
+                    len(client)))
         view = client.load_balanced_view()
         async = view.map(_fit_and_score_helper,
-                       ((clone(base_estimator), X, y, self.scorer_, train, test,
-                         self.verbose, parameters, self.fit_params,
-                         self.return_train_scores, True)
+                         ((clone(base_estimator), X, y, self.scorer_, train, test,
+                           self.verbose, parameters, self.fit_params,
+                           self.return_train_scores, True)
                 for parameters in parameter_iterable
                 for train, test in cv), block=False)
 
-        if self.verbose > 0:
-            _wait_interactive(async)
+        if verbose > 0:
+            wait_interactive(async, client, self.return_train_scores)
         async.wait()
-        if self.verbose <= 0:
+        if verbose > 0:
             async.display_outputs()
         out = async.result
 

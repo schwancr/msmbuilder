@@ -64,7 +64,7 @@ else:
             f.write('%s\n' % socket.gethostname())
 
 
-t1 = threading.Thread(target=lambda: os.system('ipcontroller --ip=* --quiet --usethreads'))
+t1 = threading.Thread(target=lambda: os.system('ipcontroller --ip=* --quiet'))
 t2 = threading.Thread(target=lambda: os.system('mpiexec -machinefile {0:s} ipengine --quiet --mpi=mpi4py '.format(
         nodefile)))
 
