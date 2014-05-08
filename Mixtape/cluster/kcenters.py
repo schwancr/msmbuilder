@@ -118,6 +118,11 @@ class _KCenters(BaseEstimator, ClusterMixin, TransformerMixin):
             self.cluster_centers_[i] = X[new_center_index]
             new_center_index = np.argmax(self.distances_)
 
+        if not isinstance(self.metric, string_types):
+            # this is a hack to make md.trajectory work using
+            # metric=md.rmsd
+            self.cluster_centers_ = self.cluster_centers_[0].join(self.cluster_centers_[1:])
+
         return self
 
     def predict(self, X):
