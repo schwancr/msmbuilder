@@ -31,7 +31,7 @@ def _fit_and_score_helper(args):
     from sklearn.cross_validation import _fit_and_score
     args = list(args)
     if isinstance(args[1], six.string_types):
-        args[1] = load(args[1], mmap_mode='r')
+        args[1] = load(args[1], mmap_mode='c')
         if isinstance(args[1], np.memmap):
             args[1] = np.asarray(args[1])
     return _fit_and_score(*args)
@@ -118,6 +118,8 @@ class DistributedBaseSeachCV(BaseSearchCV):
         if self.tmp_dir:
             tmpfn = os.path.abspath(os.path.join(self.tmp_dir,
                 'temp-{:05d}.pkl'.format(np.random.randint(1e5))))
+            if verbose:
+                print("Persisting data to {}".format(tmpfn))
             clean_me_up = dump(X, tmpfn)
             # Warm up the data to avoid concurrent disk access in
             # multiple children processes
@@ -146,6 +148,8 @@ class DistributedBaseSeachCV(BaseSearchCV):
             out = async.result
         finally:
             if self.tmp_dir:
+                if verbose:
+                    print("Cleaning up {}".format(tmpfn))
                 for fn in clean_me_up:
                     os.unlink(fn)
 
