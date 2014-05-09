@@ -3,6 +3,7 @@ import os
 import sys
 import six
 import time
+import datetime
 import numpy as np
 from scipy.stats import sem
 from sklearn.externals.joblib import load, dump
@@ -69,6 +70,25 @@ def verbose_wait(amr, clientview, return_train_scores):
             print(left + right.rjust(71-len(left)), end='')
             sys.stdout.flush()
             time.sleep(1 + round(amr.elapsed) - amr.elapsed)
+
+    n_engines = len(set(e['engine_id'] for e in amr._metadata))
+    engine_time = sum((e.completed - e.submitted for e in amr._metadata),
+                      datetime.timedelta()).total_seconds()
+
+    m1 = 'Elapsed walltime:    {}'.format(short_format_time(amr.elapsed))
+    m2 = 'Elapsed engine time: {}'.format(short_format_time(engine_time))
+    m3a = 'Parallel speedup:'
+    m3b = '{:.3f}'.format(engine_time/ amr.elapsed).rjust(len(m2)-len(m3a))
+    m4a = 'Number of engines:'
+    m4b = '{}'.format(n_engines).rjust(len(m2)-len(m4a))
+    print('\n\nTasks completed')
+    print('-'*len(m2))
+    print(m1)
+    print(m2)
+    print(m3a + m3b)
+    print(m4a + m4b)
+    print('-'*len(m2))
+
 
 
 class DistributedBaseSeachCV(BaseSearchCV):
@@ -359,7 +379,7 @@ class DistributedGridSearchCV(DistributedBaseSeachCV):
 if __name__ == '__main__':
     from sklearn.cluster import KMeans
     from sklearn.cross_validation import KFold
-    X = np.random.RandomState(0).randn(200000, 200)
+    X = np.random.RandomState(0).randn(20000, 200)
 
     print('X (MB)', X.nbytes / float(1024*1024))
 
@@ -371,4 +391,3 @@ if __name__ == '__main__':
     grid1 = DistributedGridSearchCV(KMeans(max_iter=5, n_init=1), verbose=1,
         cv=cv, refit=False, tmp_dir='.', param_grid={'n_clusters': range(100, 101)})
     grid1.fit(X)
-
