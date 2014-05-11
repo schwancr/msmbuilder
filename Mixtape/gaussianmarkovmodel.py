@@ -114,8 +114,10 @@ def gaussianMMFuncAndGrad():
     R = eigenvalues[-n_timescales:].sum()
     gradR = theano.gradient.grad(R, [mu, covars])
 
-    f = theano.function([X_concat, X_breaks, mu, covars, lag_time,
-                         n_timescales, gamma], [R, gradR[0], gradR[1]])
+    f = theano.function(
+        [X_concat, X_breaks, mu, covars, lag_time, n_timescales, gamma],
+        [R, gradR[0], gradR[1], C, rhs])
+
     FUNC_AND_GRAD = f
     return FUNC_AND_GRAD
 
@@ -272,9 +274,24 @@ class GaussianMarkovModel(BaseEstimator):
                           options=self.opt_options)
 
         self.means_, self.covars_ = np.vsplit(result.x.reshape(2*self.n_states, n_features), 2)
+        self.components_ = ...
 
         return self
 
+    def transform(self, sequences):
+        """Apply the dimensionality reduction on X.
+
+        Parameters
+        ----------
+        sequences: list of array-like, each of shape (n_samples_i, n_features)
+            Training data, where n_samples_i in the number of samples
+            in sequence i and n_features is the number of features.
+
+        Returns
+        -------
+        sequence_new : list of array-like, each of shape (n_samples_i, n_components)
+        """
+        pass
 
 # --------------------------------------------------------------------------- #
 # Utilities
