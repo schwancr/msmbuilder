@@ -257,14 +257,21 @@ class GaussianMarkovModel(BaseEstimator):
         covars0 = np.random.rand(*covars0.shape)
 
         thunk = gaussianMMFuncAndGrad()
-        def f_and_g(mu):
-            return thunk(X_concat, X_breaks, mu, covars0,
+        def f_and_g(v):
+            mu, cov = np.vsplit(v, 2)
+            f, gm, gc = thunk(X_concat, X_breaks, mu, cov,
                 self.lag_time, n_timescales, self.gamma)
+            return f, np.vstack((gm, gc))
 
-        result = maximize(f_and_g, mu0, self.opt_method, tol=self.opt_tol,
+        EPS = 1e-10
+        bounds = ([(None, None) for _ in range(mu0.size)] +
+                  [(EPS, None) for _ in range(covars0.size)])
+
+        result = maximize(f_and_g, np.vstack((mu0, covars0)), self.opt_method,
+                          bounds=bounds, tol=self.opt_tol,
                           options=self.opt_options)
 
-        self.means_ = result.x.reshape(self.n_states, n_features)
+        self.means_, self.covars_ = np.vsplit(result.x.reshape(2*self.n_states, n_features), 2)
 
         return self
 
@@ -274,7 +281,7 @@ class GaussianMarkovModel(BaseEstimator):
 # --------------------------------------------------------------------------- #
 
 
-def maximize(f_and_g, x0, method=None, tol=None, options=None):
+def maximize(f_and_g, x0, method=None, bounds=None, tol=None, options=None):
     assert x0.ndim == 2
     n, m = x0.shape
     iteration = [0]
@@ -286,7 +293,7 @@ def maximize(f_and_g, x0, method=None, tol=None, options=None):
         return -f, -g
 
     result = scipy.optimize.minimize(fun=minus_f_and_g, x0=x0.reshape(n*m),
-        jac=True, tol=tol, method=method, options=options)
+        jac=True, tol=tol, method=method, options=options, bounds=bounds)
     return result
 
 
@@ -338,5 +345,7 @@ if __name__ == '__main__':
     from sklearn.externals.joblib import load
     ds = load('/Users/rmcgibbo/projects/papers/ggrq/figure-4-experiment/doublewell-trajectories.pickl')['trajectories']
 
-    model = GaussianMarkovModel(opt_method="TNC", n_states=5, opt_options={'disp': True})
+    model = GaussianMarkovModel(opt_method="TNC", n_states=2, opt_options={'disp': True})
     model.fit(ds)
+    print(model.means_)
+    print(model.covars_)
