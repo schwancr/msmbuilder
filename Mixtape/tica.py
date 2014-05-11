@@ -221,7 +221,8 @@ class tICA(BaseEstimator, TransformerMixin):
         term = (self._outer_0_to_T_lagged + self._outer_0_to_T_lagged.T) / two_N
 
         means = self.means_
-        return term - np.outer(means, means)
+        value = term - np.outer(means, means)
+        return value
 
     @property
     def covariance_(self):
@@ -229,7 +230,8 @@ class tICA(BaseEstimator, TransformerMixin):
         term = (self._outer_0_to_TminusTau + self._outer_offset_to_T) / two_N
 
         means = self.means_
-        return term - np.outer(means, means)
+        value = term - np.outer(means, means)
+        return value
 
     def fit(self, sequences, y=None):
         """Fit the model with a collection of sequences.
