@@ -369,3 +369,4 @@ class tICA(BaseEstimator, TransformerMixin):
 
         ggrq = np.trace(V.T.dot(m2.offset_correlation_).dot(V).dot(np.linalg.pinv(V.T.dot(m2.covariance_).dot(V))))
         return ggrq
+
