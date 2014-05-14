@@ -26,6 +26,7 @@ from six.moves import cPickle
 import numpy as np
 import mdtraj as md
 import mdtraj.geometry
+from sklearn.base import BaseEstimator
 
 #-----------------------------------------------------------------------------
 # Code
@@ -89,7 +90,7 @@ def load(filename):
     return featurizer
 
 
-class Featurizer(object):
+class Featurizer(BaseEstimator):
 
     """Base class for Featurizer objects."""
 
@@ -148,6 +149,8 @@ class AtomPairsFeaturizer(Featurizer):
     """
 
     def __init__(self, pair_indices, periodic=False, exponent=1.):
+        # TODO: We might want to implement more error checking here. Or during
+        # featurize(). E.g. are the pair_indices supplied valid?
         self.pair_indices = pair_indices
         self.n_features = len(self.pair_indices)
         self.periodic = periodic
@@ -163,7 +166,7 @@ class DihedralFeaturizer(Featurizer):
 
     Parameters
     ----------
-    types : list
+    types : list of strings
         One or more of ['phi', 'psi', 'omega', 'chi1', 'chi2', 'chi3', 'chi4']
     sincos : bool
         Transform to sine and cosine (double the number of featurizers)

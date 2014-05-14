@@ -26,12 +26,14 @@ import json
 import hashlib
 import numpy as np
 from sklearn.utils import check_random_state
+from sklearn.externals.joblib import load, dump
 from numpy.linalg import norm
 import mdtraj as md
 
 #-----------------------------------------------------------------------------
 # Code
 #-----------------------------------------------------------------------------
+
 
 def sha1digest(filename):
     """SHA1 hex digest of a file
@@ -40,6 +42,18 @@ def sha1digest(filename):
     with open(filename, 'rb') as f:
         sha1.update(f.read())
     return sha1.hexdigest()
+
+
+def verbosedump(value, fn, compress=1):
+    """verbose wrapper around joblib.dump"""
+    print('Saving "%s"... (%s)' % (fn, type(value)))
+    dump(value, fn, compress=compress)
+
+
+def verboseload(fn):
+    """verbose wrapper around joblib.load"""
+    print('loading "%s"...' % fn)
+    return load(fn)
 
 
 def iterobjects(fn):
@@ -54,6 +68,7 @@ def iterobjects(fn):
 def rmsd(X, Y, yi):
     # md.rsmd isn't picklable, so this is a little proxy
     return md.rmsd(X, Y, yi, precentered=True)
+
 
 def categorical(pvals, size=None, random_state=None):
     """Return random integer from a categorical distribution
