@@ -1,0 +1,94 @@
+#!/usr/bin/env python
+"""
+Start an IPython.parallel cluster inside a PBS script.
+
+Example PBS Script
+------------------
+#PBS -l nodes=2:ppn=16
+
+pbsipcluster --daemonize   # start the cluster. 32 workers will boot
+sleep 10                   # wait for them to load
+# Run your python scripts that connects to the workers and runs jobs
+python -c 'import IPython.parallel; ...'
+
+-------------------
+"""
+from __future__ import print_function, absolute_import, division
+import os
+import time
+import socket
+import tempfile
+import argparse
+import threading
+import multiprocessing
+from IPython.utils.daemonize import daemonize
+
+
+parser = argparse.ArgumentParser(description=__doc__,
+    formatter_class=argparse.RawTextHelpFormatter)
+parser.add_argument('--uniq', help="""Start only 1 MPI rank per node (use this if your
+processes are indivually node-parallel using OpenMP)""", action='store_true', default=False)
+parser.add_argument('-v', '--verbose', help='Verbose mode (default: True)',
+    action='store_true', default=True)
+parser.add_argument('--daemonize', help='Daemonize (default: False)',
+    action='store_true', default=False)
+args = parser.parse_args()
+
+
+def log(msg):
+    if args.verbose:
+        print(msg)
+
+
+if 'PBS_NODEFILE' in os.environ:
+    if args.uniq:
+        fid, nodefile = tempfile.mkstemp()
+        os.close(fid)
+        log('Getting unique entries in PBS_NODEFILE')
+        with open(os.environ['PBS_NODEFILE']) as f:
+            nodes = set(f.readlines())
+    
+        log('{:d} unique nodes')
+        with open(nodefile, 'w') as f:
+            for node in nodes:
+                f.write(node)
+    else:
+        nodefile = os.environ['PBS_NODEFILE']
+else:
+    log('Not running under PBS')
+    fid, nodefile = tempfile.mkstemp()
+    os.close(fid)
+    count = 1 if args.uniq else multiprocessing.cpu_count()
+    with open(nodefile, 'w') as f:
+        for _ in range(count):
+            f.write('%s\n' % socket.gethostname())
+
+# parse nodefile
+hosts = []
+with open(nodefile) as f:
+  for line in f:
+    host = line.strip()
+    hosts.append(host)
+
+q = '' if args.verbose else '--quiet'
+controller = threading.Thread(target=lambda: os.system('ipcontroller --ip=* {}'.format(q)))
+engines = []
+for host in hosts:
+  engine = threading.Thread(target=lambda: os.system('ssh {} ipengine {}'.format(host, q)))
+  engines.append(engine)
+
+controller.daemon = True
+controller.start()
+time.sleep(1)
+for engine in engines:
+  engine.daemon = True
+  engine.start()
+  time.sleep(1)
+
+if args.daemonize:
+    daemonize()
+
+while True:
+    time.sleep(1)
+
+
