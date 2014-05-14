@@ -75,7 +75,10 @@ def main():
 
     q = '' if args.verbose else '--quiet'
     work_dir = os.environ['PBS_O_WORKDIR']
-    cluster_id = uuid.uuid4().get_hex()  # avoid collisions between clusters
+
+    # avoid collisions between clusters
+    cluster_id = uuid.uuid4().get_hex()
+    os.environ['IPCLUSTER_ID'] = cluster_id
 
     # start controller
     controller = threading.Thread(target=lambda: os.system(
