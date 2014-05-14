@@ -43,7 +43,7 @@ def log(msg):
 
 def main():
     if 'PBS_NODEFILE' in os.environ:
-        if args.uniq:
+        if args.unique:
             fid, nodefile = tempfile.mkstemp()
             os.close(fid)
             log('Getting unique entries in PBS_NODEFILE')
@@ -60,7 +60,7 @@ def main():
         log('Not running under PBS')
         fid, nodefile = tempfile.mkstemp()
         os.close(fid)
-        count = 1 if args.uniq else multiprocessing.cpu_count()
+        count = 1 if args.unique else multiprocessing.cpu_count()
         with open(nodefile, 'w') as f:
             for _ in range(count):
                 f.write('%s\n' % socket.gethostname())
