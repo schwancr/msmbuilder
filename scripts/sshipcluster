@@ -22,6 +22,7 @@ import socket
 import tempfile
 import threading
 import time
+import uuid
 
 parser = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawTextHelpFormatter)
@@ -74,10 +75,12 @@ def main():
 
     q = '' if args.verbose else '--quiet'
     work_dir = os.environ['PBS_O_WORKDIR']
+    cluster_id = uuid.uuid4().get_hex()  # avoid collisions between clusters
 
     # start controller
     controller = threading.Thread(target=lambda: os.system(
-        'ipcontroller --ip=* --work-dir={} {}'.format(work_dir, q)))
+        'ipcontroller --ip=* --work-dir={} --cluster-id={} {}'.format(
+            work_dir, cluster_id, q)))
     controller.daemon = True
     controller.start()
     time.sleep(1)  # wait for the controller to load
@@ -85,7 +88,8 @@ def main():
     # start engines
     for host in hosts:
         engine = threading.Thread(target=lambda: os.system(
-            'ssh {} ipengine --work-dir={} {}'.format(host, work_dir, q)))
+            'ssh {} ipengine --work-dir={} --cluster-id={} {}'.format(
+                host, work_dir, cluster_id, q)))
         engine.daemon = True
         engine.start()
 
