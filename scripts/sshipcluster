@@ -26,8 +26,8 @@ import time
 parser = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawTextHelpFormatter)
 parser.add_argument('--uniq',
-                    help='Start only 1 MPI rank per node (use this if your ' +
-                         'processes are indivually node-parallel).',
+                    help='Start only ipengine per node (use this if your ' +
+                         'processes are individually node-parallel).',
                     action='store_true', default=False)
 parser.add_argument('-v', '--verbose', help='Verbose mode (default: True)',
                     action='store_true', default=True)
