@@ -73,10 +73,11 @@ def main():
             hosts.append(host)
 
     q = '' if args.verbose else '--quiet'
+    work_dir = os.environ['PBS_O_WORKDIR']
 
     # start controller
     controller = threading.Thread(target=lambda: os.system(
-        'ipcontroller --ip=* {}'.format(q)))
+        'ipcontroller --ip=* --work-dir={} {}'.format(work_dir, q)))
     controller.daemon = True
     controller.start()
     time.sleep(1)  # wait for the controller to load
@@ -84,7 +85,7 @@ def main():
     # start engines
     for host in hosts:
         engine = threading.Thread(target=lambda: os.system(
-            'ssh {} ipengine {}'.format(host, q)))
+            'ssh {} ipengine --work-dir={} {}'.format(host, work_dir, q)))
         engine.daemon = True
         engine.start()
 
