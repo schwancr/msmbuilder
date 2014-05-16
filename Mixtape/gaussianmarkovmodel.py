@@ -24,6 +24,7 @@
 
 from __future__ import print_function, division, absolute_import
 
+import sys
 import functools
 import numpy as np
 import scipy.optimize
@@ -144,11 +145,15 @@ def gaussianMMFuncAndGrad():
     R = eigenvalues[-n_timescales:].sum()
     gradR = theano.gradient.grad(R, [mu, covars])
 
-    f = theano.function(
+    print('compiling theano functions...', end=' ')
+    sys.stdout.flush()
+    f1 = theano.function(
         [X_concat, X_breaks, mu, covars, lag_time, n_timescales, gamma],
         [R, gradR[0], gradR[1], C, rhs, chimeans])
+    f2 = theano.function([X_concat, X_breaks, mu, covars, lag_time], [C, S])
+    print('\tcompilation done')
 
-    return f
+    return f1, f2
 
 
 class GaussianMarkovModel(BaseEstimator):
@@ -264,13 +269,7 @@ class GaussianMarkovModel(BaseEstimator):
         -------
         self
         """
-        # check sequences
-        assert isinstance(sequences, list), 'sequences must be a list of arrays'
-        X_breaks = np.cumsum([0,] + [len(s) for s in sequences],
-                             dtype=np.int32)
-        X_concat = np.concatenate(sequences)
-        assert X_concat.ndim == 2
-
+        X_concat, X_breaks = self._concat(sequences)
         n_features = X_concat.shape[1]
 
         # How many timesccales?
@@ -291,7 +290,7 @@ class GaussianMarkovModel(BaseEstimator):
 
         # Get the thunk and make the function (objective, grad) callalable
         # to optimize
-        thunk = gaussianMMFuncAndGrad()
+        thunk = gaussianMMFuncAndGrad()[0]
         def f_and_g(v):
             mu, cov = np.vsplit(v, 2)
             f, gm, gc, _, _, _ = thunk(X_concat, X_breaks, mu, cov,
@@ -323,7 +322,7 @@ class GaussianMarkovModel(BaseEstimator):
         return self
 
     def transform(self, sequences):
-        """Apply the dimensionality reduction on a collection of seqences
+        """Apply the dimensionality reduction on a collection of sequences
 
         Parameters
         ----------
@@ -335,7 +334,7 @@ class GaussianMarkovModel(BaseEstimator):
         -------
         sequence_new : list of array-like, each of shape (n_samples_i, n_components)
         """
-        return [self.partial_transform(s) for s in sequences]
+        return [self.partial_transform(X) for X in sequences]
 
     def partial_transform(self, X):
         """Apply the dimensionality reduction on X
@@ -347,3 +346,25 @@ class GaussianMarkovModel(BaseEstimator):
         """
         chi = np.exp(gmm._log_multivariate_normal_density_diag(X, self.means_, self.covars_))
         return np.dot(chi - self.chimeans_, self.eigenvectors_)
+
+    def score(self, sequences):
+        """Score a fit model on new sequences
+        """
+        X_concat, X_breaks = self._concat(sequences)
+        assert hasattr(self, 'eigenvectors_'), 'model has not yet been fit'
+
+        # the complexity of the theano thunk-generator is getting a little
+        # out of control. maybe it can be refactored to be a little simpler?
+        thunk = gaussianMMFuncAndGrad()[1]
+        C, S = thunk(X_concat, X_breaks, self.means_, self.covars_, self.lag_time)
+
+        V = self.eigenvectors_
+        ggrq = np.trace(V.T.dot(C).dot(V).dot(np.linalg.pinv(V.T.dot(S).dot(V))))
+        return ggrq
+
+    def _concat(self, sequences):
+        assert isinstance(sequences, list), 'sequences must be a list of arrays'
+        X_breaks = np.cumsum([0,] + [len(s) for s in sequences], dtype=np.int32)
+        X_concat = np.concatenate(sequences)
+        assert X_concat.ndim == 2
+        return X_concat, X_breaks
