@@ -24,8 +24,6 @@
 
 from __future__ import print_function, division, absolute_import
 
-import os
-import time
 import functools
 import numpy as np
 import scipy.optimize
@@ -34,17 +32,16 @@ from sklearn import cluster
 from sklearn.mixture import gmm
 from sklearn.base import BaseEstimator
 from sklearn.mixture import distribute_covar_matrix_to_match_covariance_type
-from mixtape.tica import tICA
 
 try:
     import theano
-    from theano.printing import Print
+    # from theano.printing import Print
     from theano import tensor as T
     from theano.sandbox import linalg
     linalg.eigvalsh  # make sure this exists
-    imported_theano = True
+    IMPORTED_THEANO = True
 except (ImportError, AttributeError):
-    imported_theano = False
+    IMPORTED_THEANO = False
 
 
 __all__ = ['GaussianMarkovModel']
@@ -72,7 +69,6 @@ def _maximize_matfun(f_and_g, x0, method=None, bounds=None, tol=None, options=No
     takes a matrix as input"""
     assert x0.ndim == 2
     n, m = x0.shape
-    iteration = [0]
 
     def minus_f_and_g(v):
         x = v.reshape(n, m)
@@ -100,7 +96,7 @@ def _multivariate_normal_density_diag(X, means, covars):
 
 @_memoized
 def gaussianMMFuncAndGrad():
-    assert imported_theano, 'The latest version of theano is required'
+    assert IMPORTED_THEANO, 'The latest version of theano is required'
 
     X_concat = T.dmatrix('X')           # n_samples total x n_features
     X_breaks = T.ivector('X_breaks')    # indices of the breaks in X_concat
@@ -124,7 +120,6 @@ def gaussianMMFuncAndGrad():
     # changing chi_concat to just X_concat recovers standard tICA. i.e:
     # chi_concat = X_concat + 0*mu.sum() + 0*covars.sum()
     n_components = chi_concat.shape[1]
-    n_features = mu.shape[1]
 
     (SS, CC, MM), _ = theano.reduce(
         fn=_accumulate,
@@ -290,9 +285,9 @@ class GaussianMarkovModel(BaseEstimator):
         else:
             means0, covars0 = self._hotstart(X_concat)
             if hasattr(self, 'means_'):
-               means0 = self.means_
+                means0 = self.means_
             if hasattr(self, 'covars_'):
-               covars0 = self.covars_
+                covars0 = self.covars_
 
         # Get the thunk and make the function (objective, grad) callalable
         # to optimize
