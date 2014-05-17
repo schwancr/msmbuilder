@@ -221,7 +221,7 @@ class GaussianMarkovModel(BaseEstimator):
     """
 
     def __init__(self, n_components=2, lag_time=1, n_timescales=None, gamma=0.05,
-                 random_state=None, opt_method='BFGS', opt_tol=None,
+                 random_state=None, opt_method='L-BFGS-B', opt_tol=None,
                  opt_options=None):
         self.n_components = n_components
         self.lag_time = lag_time
@@ -317,7 +317,7 @@ class GaussianMarkovModel(BaseEstimator):
 
         self.eigenvalues_ = eigenvalues_[order]
         self.eigenvectors_ = eigenvectors_[:, order]
-        self.timescales = -self.lag_time / np.log(self.eigenvalues_)
+        self.timescales_ = -self.lag_time / np.log(self.eigenvalues_)
 
         return self
 

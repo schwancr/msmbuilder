@@ -26,6 +26,7 @@ import time
 import warnings
 import numpy as np
 import scipy.sparse
+import scipy.linalg
 from sklearn.base import BaseEstimator
 from mdtraj.utils import ensure_type
 from mixtape import _reversibility
@@ -92,6 +93,8 @@ class MarkovStateModel(BaseEstimator):
         number of transitions from state i to state j after correcting
         for reversibly. The indices `i` and `j` are the "internal" indices
         described above.
+    timescales_ : np.array, shape=(n_timescales, )
+        Implied timescales, in descending order.
 
     """
 
@@ -187,7 +190,14 @@ class MarkovStateModel(BaseEstimator):
         if n_timescales is None:
             n_timescales = self.transmat_.shape[0] - 3
 
-        u, v = scipy.sparse.linalg.eigs(self.transmat_, k=n_timescales + 1)
+        if self.transmat_.shape[0] < 10:
+            u, v = scipy.linalg.eig(self.transmat_.todense())
+            order = np.argsort(-np.real(u))
+            u = np.real_if_close(u[order][:n_timescales+1])
+            v = np.real_if_close(v[:, order][:, :n_timescales+1])
+        else:
+            u, v = scipy.sparse.linalg.eigs(self.transmat_, k=n_timescales + 1)
+
         order = np.argsort(-np.real(u))
         u = np.real_if_close(u[order])
 
