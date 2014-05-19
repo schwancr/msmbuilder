@@ -7,31 +7,38 @@ Example PBS Script
 #PBS -l nodes=2:ppn=16
 
 pbsipcluster --daemonize   # start the cluster. 32 workers will boot
-sleep 10                   # wait for them to load
+
 # Run your python scripts that connects to the workers and runs jobs
 python -c 'import IPython.parallel; ...'
-
 -------------------
 """
 from __future__ import print_function, absolute_import, division
+import argparse
+from IPython.utils.daemonize import daemonize
+import multiprocessing
 import os
-import time
 import socket
 import tempfile
-import argparse
 import threading
-import multiprocessing
-from IPython.utils.daemonize import daemonize
-
+import time
 
 parser = argparse.ArgumentParser(description=__doc__,
-    formatter_class=argparse.RawTextHelpFormatter)
-parser.add_argument('--uniq', help="""Start only 1 MPI rank per node (use this if your
-processes are indivually node-parallel using OpenMP)""", action='store_true', default=False)
-parser.add_argument('-v', '--quiet', help='Run quietly (default: False)',
-    action='store_true', default=False)
+                                 formatter_class=argparse.RawTextHelpFormatter)
+parser.add_argument('--unique',
+                    help='Start only ipengine per node (use this if your ' +
+                         'processes are individually node-parallel).',
+                    action='store_true', default=False)
+parser.add_argument('-q', '--quiet', help='Quiet mode (default: False)',
+                    action='store_true', default=False)
 parser.add_argument('--daemonize', help='Daemonize (default: False)',
-    action='store_true', default=False)
+                    action='store_true', default=False)
+parser.add_argument('-id', '--cluster-id',
+                    help='Set the cluster ID to avoid collisions.')
+parser.add_argument('--launcher', choices=['ssh', 'mpi'], default='ssh',
+                    help='launch the ipengines by ssh-ing to the nodes ' +
+                    'or using the mpiexec launcher.\nNote that "ssh" requires ' +
+                    'passwordless ssh to be set up between the nodes,\nwhile ' +
+                    'mpi" requires a working MPI installation.')
 args = parser.parse_args()
 
 
@@ -40,45 +47,87 @@ def log(msg):
         print(msg)
 
 
-if 'PBS_NODEFILE' in os.environ:
-    if args.uniq:
-        fid, nodefile = tempfile.mkstemp()
-        os.close(fid)
-        log('Getting unique entries in PBS_NODEFILE')
-        with open(os.environ['PBS_NODEFILE']) as f:
-            nodes = set(f.readlines())
-    
-        log('{:d} unique nodes')
-        with open(nodefile, 'w') as f:
-            for node in nodes:
-                f.write(node)
+def main():
+    own_nodfile = False
+
+    if 'PBS_NODEFILE' in os.environ:
+        if args.unique:
+            fid, nodefile = tempfile.mkstemp()
+            own_nodefile = True
+            os.close(fid)
+            log('Getting unique entries in PBS_NODEFILE')
+            with open(os.environ['PBS_NODEFILE']) as f:
+                nodes = set(f.readlines())
+
+            log('{:d} unique nodes')
+            with open(nodefile, 'w') as f:
+                for node in nodes:
+                    f.write(node)
+        else:
+            nodefile = os.environ['PBS_NODEFILE']
     else:
-        nodefile = os.environ['PBS_NODEFILE']
-else:
-    log('Not running under PBS')
-    fid, nodefile = tempfile.mkstemp()
-    os.close(fid)
-    count = 1 if args.uniq else multiprocessing.cpu_count()
-    with open(nodefile, 'w') as f:
-        for _ in range(count):
-            f.write('%s\n' % socket.gethostname())
+        log('Not running under PBS')
+        fid, nodefile = tempfile.mkstemp()
+        own_nodefile = True
+        os.close(fid)
+        count = 1 if args.unique else multiprocessing.cpu_count()
+        with open(nodefile, 'w') as f:
+            for _ in range(count):
+                f.write('%s\n' % socket.gethostname())
 
+    q = '--quiet' if args.quiet else ''
+    if 'PBS_O_WORKDIR' in os.environ:
+        work_dir = '--work-dir={}'.format(os.environ['PBS_O_WORKDIR'])
+    else:
+        work_dir = ''
+    if args.cluster_id:
+        cluster_id = '--cluster-id={}'.format(args.cluster_id)
+    else:
+        cluster_id = ''
 
-q = '--quiet' if args.quiet else ''
-t1 = threading.Thread(target=lambda: os.system('ipcontroller --ip=* {0:s}'.format(q)))
-t2 = threading.Thread(target=lambda: os.system('mpiexec -machinefile {0:s} ipengine {1:s} --mpi=mpi4py '.format(
-        nodefile, q)))
+    # start controller
+    controller = threading.Thread(target=lambda: os.system(
+        'ipcontroller --ip=* {} {} {}'.format(work_dir, cluster_id, q)))
+    controller.daemon = True
+    controller.start()
+    time.sleep(1)  # wait for the controller to load
 
-t1.daemon = True
-t2.daemon = True
-t1.start()
-time.sleep(1)
-t2.start()
+    # start engines
+    if args.launcher == 'ssh':
+        # parse nodefile
+        hosts = []
+        with open(nodefile) as f:
+            for line in f:
+                host = line.strip()
+                hosts.append(host)
 
-if args.daemonize:
-    daemonize()
+        for host in hosts:
+            engine = threading.Thread(target=lambda: os.system(
+                'ssh {} ipengine {} {} {}'.format(host, work_dir, cluster_id, q)))
+            engine.daemon = True
+            engine.start()
+    elif args.launcher == 'mpi':
+        engine = threading.Thread(target=lambda: os.system(
+            ('mpiexec -machinefile {nodefile} '
+             'ipengine {clusterid} {quiet} --mpi=mpi4py')
+            .format(nodefile=nodefile, work_dir=work_dir,
+                    clusterid=cluster_id, quiet=q)))
+        engine.daemon = True
+        engine.start()
+    else:
+        raise NotImplementedError()
 
-while True:
-    time.sleep(1)
+    # wait for engines to load
+    time.sleep(10)
 
+    if own_nodefile:
+        os.unlink(nodefile)
 
+    if args.daemonize:
+        daemonize()
+
+    while True:
+        time.sleep(1)
+
+if __name__ == '__main__':
+    main()
