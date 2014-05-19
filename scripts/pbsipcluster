@@ -48,7 +48,7 @@ def log(msg):
 
 
 def main():
-    own_nodfile = False
+    own_nodefile = False
 
     if 'PBS_NODEFILE' in os.environ:
         if args.unique:
