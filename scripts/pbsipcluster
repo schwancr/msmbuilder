@@ -28,15 +28,15 @@ parser = argparse.ArgumentParser(description=__doc__,
     formatter_class=argparse.RawTextHelpFormatter)
 parser.add_argument('--uniq', help="""Start only 1 MPI rank per node (use this if your
 processes are indivually node-parallel using OpenMP)""", action='store_true', default=False)
-parser.add_argument('-v', '--verbose', help='Verbose mode (default: True)',
-    action='store_true', default=True)
+parser.add_argument('-v', '--quiet', help='Run quietly (default: False)',
+    action='store_true', default=False)
 parser.add_argument('--daemonize', help='Daemonize (default: False)',
     action='store_true', default=False)
 args = parser.parse_args()
 
 
 def log(msg):
-    if args.verbose:
+    if not args.quiet:
         print(msg)
 
 
@@ -64,7 +64,7 @@ else:
             f.write('%s\n' % socket.gethostname())
 
 
-q = '' if args.verbose else '--quiet'
+q = '--quiet' if args.quiet else ''
 t1 = threading.Thread(target=lambda: os.system('ipcontroller --ip=* {0:s}'.format(q)))
 t2 = threading.Thread(target=lambda: os.system('mpiexec -machinefile {0:s} ipengine {1:s} --mpi=mpi4py '.format(
         nodefile, q)))
