@@ -53,11 +53,8 @@ class tICA(BaseEstimator, TransformerMixin):
         Regularization strength. Positive `gamma` entails incrementing
         the sample covariance matrix by a constant times the identity,
         to ensure that it is positive definite. The exact form of the
-        regularized sample covariance matrix is ::
-
-            covariance + (gamma / n_features) * Tr(covariance) * Identity
-
-        where :math:`Tr` is the trace operator.
+        regularized sample covariance matrix is
+        :math:`covariance + (gamma / n_features) * Tr(covariance) * Identity`
     weighted_transform : bool, default=False
         If True, weight the projections by the implied timescales, giving
         a quantity that has units [Time].
@@ -96,22 +93,23 @@ class tICA(BaseEstimator, TransformerMixin):
 
     Notes
     -----
-    This method was introduced originally in [4], and has been applied to the
-    analysis of molecular dynamics data in [1], [2], and [3]. In [1] and [2],
+    This method was introduced originally in [4]_, and has been applied to the
+    analysis of molecular dynamics data in [1]_, [2]_, and [3]_. In [1]_ and [2]_,
     tICA was used as a dimensionality reduction technique before fitting
     other kinetic models.
 
+
     References
     ----------
-    .. [1] Schwantes, Christian R., and Vijay S. Pande. J. Chem Theory Comput.
-    9.4 (2013): 2000-2009.
+    .. [1] Schwantes, Christian R., and Vijay S. Pande. J.
+       Chem Theory Comput. 9.4 (2013): 2000-2009.
     .. [2] Perez-Hernandez, Guillermo, et al. J Chem. Phys (2013): 015102.
     .. [3] Naritomi, Yusuke, and Sotaro Fuchigami. J. Chem. Phys. 134.6
-    (2011): 065101.
+       (2011): 065101.
     .. [4] Molgedey, Lutz, and Heinz Georg Schuster. Phys. Rev. Lett. 72.23
-    (1994): 3634.
+       (1994): 3634.
     """
-
+    
     def __init__(self, n_components=None, lag_time=1, gamma=0.05, weighted_transform=False):
         self.n_components = n_components
         self.lag_time = lag_time
@@ -203,7 +201,7 @@ class tICA(BaseEstimator, TransformerMixin):
     @property
     def timescales_(self):
         self._solve()
-        return -1. * self.offset / np.log(self._eigenvalues_)
+        return -1. * self.lag_time / np.log(self._eigenvalues_)
 
     @property
     def components_(self):
@@ -221,7 +219,8 @@ class tICA(BaseEstimator, TransformerMixin):
         term = (self._outer_0_to_T_lagged + self._outer_0_to_T_lagged.T) / two_N
 
         means = self.means_
-        return term - np.outer(means, means)
+        value = term - np.outer(means, means)
+        return value
 
     @property
     def covariance_(self):
@@ -229,7 +228,8 @@ class tICA(BaseEstimator, TransformerMixin):
         term = (self._outer_0_to_TminusTau + self._outer_offset_to_T) / two_N
 
         means = self.means_
-        return term - np.outer(means, means)
+        value = term - np.outer(means, means)
+        return value
 
     def fit(self, sequences, y=None):
         """Fit the model with a collection of sequences.
@@ -305,6 +305,29 @@ class tICA(BaseEstimator, TransformerMixin):
 
         return sequences_new
 
+    def partial_transform(self, features):
+        """Apply the dimensionality reduction on X.
+
+        Parameters
+        ----------
+        features: array-like, shape (n_samples, n_features)
+            Training data, where n_samples in the number of samples
+            and n_features is the number of features.  This function
+            acts on a single featurized trajectory.
+
+        Returns
+        -------
+        sequence_new : array-like, shape (n_samples, n_components)
+            TICA-projected features
+            
+        Notes
+        -----
+        This function acts on a single featurized trajectory. 
+
+        """
+        sequences = [features]
+        return self.transform(sequences)[0]
+
     def fit_transform(self, sequences, y=None):
         """Fit the model with X and apply the dimensionality reduction on X.
 
@@ -367,3 +390,4 @@ class tICA(BaseEstimator, TransformerMixin):
 
         ggrq = np.trace(V.T.dot(m2.offset_correlation_).dot(V).dot(np.linalg.pinv(V.T.dot(m2.covariance_).dot(V))))
         return ggrq
+

@@ -3,12 +3,14 @@ import os
 import sys
 import six
 import time
+import datetime
 import numpy as np
 from scipy.stats import sem
 from sklearn.externals.joblib import load, dump
 from sklearn.externals.joblib.logger import short_format_time
 
 from IPython.parallel import Client
+from IPython.parallel.error import RemoteError
 from IPython.display import clear_output
 
 try:
@@ -55,20 +57,42 @@ def verbose_wait(amr, clientview, return_train_scores):
 
         for msg_id in finished:
             ar = clientview.get_result(msg_id)
-            for result in ar.result:
-                elapsed, params = result[-2], result[-1]
-                test_score = result[1] if return_train_scores else result[0]
-                left = '[CV engine={}] {}   '.format(ar.engine_id,
-                    ', '.join('{}={}'.format(k, v) for k, v in params.items()))
-                right = '  score = {:5f}  {}'.format(test_score, short_format_time(elapsed))
-                print(left + right.rjust(70-len(left), '-'))
-
+            try:
+                for result in ar.result:
+                    elapsed, params = result[-2], result[-1]
+                    test_score = result[1] if return_train_scores else result[0]
+                    left = '[CV engine={}] {}   '.format(ar.engine_id,
+                        ', '.join('{}={}'.format(k, v) for k, v in params.items()))
+                    right = '  score = {:5f}  {}'.format(test_score, short_format_time(elapsed))
+                    print(left + right.rjust(70-len(left), '-'))
+            except RemoteError as e:
+                e.print_traceback()
+                raise
         else:
             left = '\r[Parallel] {0:d}/{1:d}  tasks finished'.format(n_completed, N)
             right = 'elapsed {0}         '.format(short_format_time(amr.elapsed))
             print(left + right.rjust(71-len(left)), end='')
             sys.stdout.flush()
             time.sleep(1 + round(amr.elapsed) - amr.elapsed)
+
+    n_engines = len(set(e['engine_id'] for e in amr._metadata))
+    engine_time = sum((e.completed - e.submitted for e in amr._metadata),
+                      datetime.timedelta()).total_seconds()
+
+    m1 = 'Elapsed walltime:    {}'.format(short_format_time(amr.elapsed))
+    m2 = 'Elapsed engine time: {}'.format(short_format_time(engine_time))
+    m3a = 'Parallel speedup:'
+    m3b = '{:.3f}'.format(engine_time/ amr.elapsed).rjust(len(m2)-len(m3a))
+    m4a = 'Number of engines:'
+    m4b = '{}'.format(n_engines).rjust(len(m2)-len(m4a))
+    print('\n\nTasks completed')
+    print('-'*len(m2))
+    print(m1)
+    print(m2)
+    print(m3a + m3b)
+    print(m4a + m4b)
+    print('-'*len(m2))
+
 
 
 class DistributedBaseSeachCV(BaseSearchCV):
@@ -145,7 +169,11 @@ class DistributedBaseSeachCV(BaseSearchCV):
             async.wait()
             if verbose > 0:
                 async.display_outputs()
-            out = async.result
+            try:
+                out = async.result
+            except RemoteError as e:
+                e.print_traceback()
+                raise
         finally:
             if self.tmp_dir:
                 if verbose:
@@ -354,21 +382,3 @@ class DistributedGridSearchCV(DistributedBaseSeachCV):
 
         """
         return self._fit(X, y, ParameterGrid(self.param_grid))
-
-
-if __name__ == '__main__':
-    from sklearn.cluster import KMeans
-    from sklearn.cross_validation import KFold
-    X = np.random.RandomState(0).randn(200000, 200)
-
-    print('X (MB)', X.nbytes / float(1024*1024))
-
-    # cv = KFold(len(X), n_folds=5)
-    # grid2 = GridSearchCV(SVC(), n_jobs=-1, verbose=10, cv=cv, param_grid={'C': range(1,100)})
-    # grid2.fit(X, y)
-
-    cv = KFold(len(X), n_folds=5)
-    grid1 = DistributedGridSearchCV(KMeans(max_iter=5, n_init=1), verbose=1,
-        cv=cv, refit=False, tmp_dir='.', param_grid={'n_clusters': range(100, 101)})
-    grid1.fit(X)
-

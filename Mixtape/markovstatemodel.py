@@ -26,6 +26,7 @@ import time
 import warnings
 import numpy as np
 import scipy.sparse
+import scipy.linalg
 from sklearn.base import BaseEstimator
 from mdtraj.utils import ensure_type
 from mixtape import _reversibility
@@ -37,15 +38,21 @@ __all__ = ['MarkovStateModel']
 #-----------------------------------------------------------------------------
 
 class MarkovStateModel(BaseEstimator):
-
     """Reversible Markov State Model
 
     Parameters
     ----------
     n_states : int
-        The number of states in the model
+        The number of states in the model. If not supplied, this will be
+        inferred, which works fine if every state is visited in the input data.
+        But the states visited in the input sequence passed in to fit() are
+        not in [0, ..., n_states-1], then all bets are off.
     lag_time : int
         The lag time of the model
+    n_timescales : int, optional
+        The number of dynamical timescales to calculate when diagonalizing
+        the transition matrix. By default, the maximum number will be
+        calculated, which, for ARPACK, is n_states - 3.
     reversible_type : {'mle', 'transpose', None}
         Method by which the reversibility of the transition matrix
         is enforced. 'mle' uses a maximum likelihood method that is
@@ -67,33 +74,31 @@ class MarkovStateModel(BaseEstimator):
 
     Attributes
     ----------
-    mapping_ : dict
-        Mapping between "input" states and internal state indices for this
-        Markov state model. The indexing of the states in the labeled
-        sequences supplied to fit() may have gaps (i.e. the unique indices
-        are not continuous integers starting from zero), or, if
-        `ergodic_trim==True`, some of those "input states" may be excluded
-        from the model because they do not lie in the maximal ergodic subgraph.
-        In either case, the semantics of `mapping_[i] = j` is that state `i`
-        from the "input space" is represented by the index `j` in this Markov
-        state model.
-    rawcounts_ : array_like, shape(n_states, n_states)
-        Unsymmetrized transition counts. rawcounts_[i, j] is the observed
-        number of transitions from state i to state j. The indices `i` and
-        `j` are the "internal" indices described above.
-    countsmat_ : array_like, shape(n_states, n_states)
-         Symmetrized transition counts. countsmat_[i, j] is the expected
-         number of transitions from state i to state j after correcting
-         for reversibly. The indices `i` and `j` are the "internal" indices
-         described above.
     transmat_ : array_like, shape(n_states, n_states)
         Maximum likelihood estimate of the reversible transition matrix.
         The indices `i` and `j` are the "internal" indices described above.
     populations_ : array, shape(n_states)
         The equilibrium population (stationary eigenvector) of transmat_
+    mapping_ : dict
+        Mapping between "input" states and internal state indices for this
+        Markov state model.  This is necessary because of ergodic_trim.
+        The semantics of ``mapping_[i] = j`` is that state ``i`` from the
+        "input space" is represented by the index ``j`` in this MSM.
+    rawcounts_ : array_like, shape(n_states, n_states)
+        Unsymmetrized transition counts. rawcounts_[i, j] is the observed
+        number of transitions from state i to state j. The indices `i` and
+        `j` are the "internal" indices described above.
+    countsmat_ : array_like, shape(n_states, n_states)
+        Symmetrized transition counts. countsmat_[i, j] is the expected
+        number of transitions from state i to state j after correcting
+        for reversibly. The indices `i` and `j` are the "internal" indices
+        described above.
+    timescales_ : np.array, shape=(n_timescales, )
+        Implied timescales, in descending order.
+
     """
 
-    def __init__(self, n_states=None, n_timescales=None, lag_time=1,
+    def __init__(self, n_states=None, lag_time=1, n_timescales=None,
                  reversible_type='mle', ergodic_trim=True, prior_counts=0):
         self.n_states = n_states
         self.reversible_type = reversible_type
@@ -181,7 +186,18 @@ class MarkovStateModel(BaseEstimator):
 
     @property
     def timescales_(self):
-        u, v = scipy.sparse.linalg.eigs(self.transmat_, k=self.n_timescales + 1)
+        n_timescales = self.n_timescales
+        if n_timescales is None:
+            n_timescales = self.transmat_.shape[0] - 3
+
+        if self.transmat_.shape[0] < 10:
+            u, v = scipy.linalg.eig(self.transmat_.todense())
+            order = np.argsort(-np.real(u))
+            u = np.real_if_close(u[order][:n_timescales+1])
+            v = np.real_if_close(v[:, order][:, :n_timescales+1])
+        else:
+            u, v = scipy.sparse.linalg.eigs(self.transmat_, k=n_timescales + 1)
+
         order = np.argsort(-np.real(u))
         u = np.real_if_close(u[order])
 
@@ -221,3 +237,73 @@ class MarkovStateModel(BaseEstimator):
             trace = np.nan
 
         return trace
+
+
+def ndgrid_msm_likelihood_score(estimator, sequences):
+    """Log-likelihood score function for an (NDGrid, MarkovStateModel) pipeline
+
+    Parameters
+    ----------
+    estimator : sklearn.pipeline.Pipeline
+        A pipeline estimator containing an NDGrid followed by a MarkovStateModel
+    sequences: list of array-like, each of shape (n_samples_i, n_features)
+        Data sequences, where n_samples_i in the number of samples
+        in sequence i and n_features is the number of features.
+
+    Returns
+    -------
+    log_likelihood : float
+        Mean log-likelihood per data point.
+
+    Examples
+    --------
+    >>> pipeline = Pipeline([
+    >>>    ('grid', NDGrid()),
+    >>>    ('msm', MarkovStateModel())
+    >>> ])
+    >>> grid = GridSearchCV(pipeline, param_grid={
+    >>>    'grid__n_bins_per_feature': [10, 20, 30, 40]
+    >>> }, scoring=ndgrid_msm_likelihood_score)
+    >>> grid.fit(dataset)
+    >>> print grid.grid_scores_
+
+    References
+    ----------
+    .. [1] McGibbon, R. T., C. R. Schwantes, and V. S. Pande. "Statistical
+       Model Selection for Markov Models of Biomolecular Dynamics." J. Phys.
+       Chem B. (2014)
+    """
+    import msmbuilder.MSMLib as msmlib
+    from mixtape import cluster
+    grid = [model for (name, model) in estimator.steps if isinstance(model, cluster.NDGrid)][0]
+    msm = [model for (name, model) in estimator.steps if isinstance(model, MarkovStateModel)][0]
+    # NDGrid supports min/max being different along different directions, which
+    # means that the bin widths are coordinate dependent. But I haven't
+    # implemented that because I've only been using this for 1D data
+    if grid.n_features != 1:
+        raise NotImplementedError("file an issue on github :)")
+
+    transition_log_likelihood = 0
+    emission_log_likelihood = 0
+    logtransmat = np.nan_to_num(np.log(np.asarray(msm.transmat_.todense())))
+    width = grid.grid[0,1] - grid.grid[0,0]
+
+    for X in grid.transform(sequences):
+        counts = np.asarray(_apply_mapping_to_matrix(
+            msmlib.get_counts_from_traj(X, n_states=grid.n_bins),
+            msm.mapping_).todense())
+        transition_log_likelihood += np.multiply(counts, logtransmat).sum()
+        emission_log_likelihood += -1 * np.log(width) * len(X)
+
+    return (transition_log_likelihood + emission_log_likelihood) / sum(len(x) for x in sequences)
+
+
+def _apply_mapping_to_matrix(mat, mapping):
+    ndim_new = np.max(mapping.values()) + 1
+    mat_new = scipy.sparse.dok_matrix((ndim_new, ndim_new))
+    for (i, j), e in mat.todok().items():
+        try:
+            mat_new[mapping[i], mapping[j]] = e
+        except KeyError:
+            pass
+    return mat_new

@@ -126,7 +126,8 @@ class _NDGrid(BaseEstimator, ClusterMixin, TransformerMixin):
             Index of the grid cell containing each sample
         """
         if np.any(X < self.grid[:, 0]) or np.any(X > self.grid[:, -1]):
-            raise ValueError('data out of min/max bounds')
+            raise ValueError('data out of min/max bounds min(X)={}, '
+                             'grid[:,0]={}'.format(np.min(X), self.grid[:, 0]))
 
         binassign = np.zeros((self.n_features, len(X)), dtype=int)
         for i in range(self.n_features):
