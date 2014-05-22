@@ -22,6 +22,7 @@
 #-----------------------------------------------------------------------------
 from __future__ import print_function, division, absolute_import
 
+import os
 import json
 import hashlib
 import numpy as np
@@ -54,6 +55,22 @@ def verboseload(fn):
     """verbose wrapper around joblib.load"""
     print('loading "%s"...' % fn)
     return load(fn)
+
+
+def verbosedump_or_skip(function, fn, compress=1, digest=None):
+    if os.path.exists(fn):
+        try:
+            loaded = verboseload(fn)
+            if digest is None or loaded['digest'] == digest:
+                print('Skipping %s. Already exists' % fn)
+                return
+        except:
+            pass
+
+    value = function()
+    verbosedump({'value': value,
+                 'digest': digest},
+                fn, compress=compress)
 
 
 def iterobjects(fn):
