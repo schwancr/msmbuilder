@@ -82,6 +82,29 @@ def iterobjects(fn):
         except ValueError:
             pass
 
+def gridscores_to_dataframe(grid):
+    """Convert the grid_scores_ from a DistributedGridSearchCV
+    run into a pandas dataframe that is easier to plot and
+    manipulate
+
+    Parameters
+    ----------
+    grid_scores_ : list of dicts
+    """
+    import pandas
+    items = []
+    for elem in grid:
+        item = {'test_mean' : elem['cv_validation_scores'].mean(),
+                'test_std' : elem['cv_validation_scores'].std()}
+        item.update(elem['parameters'])
+        if 'cv_train_scores' in elem:
+            item['train_mean'] = elem['cv_train_scores'].mean()
+            item['train_std'] = elem['cv_train_scores'].std()
+        items.append(item)
+
+    return pandas.DataFrame(items)
+
+
 def rmsd(X, Y, yi):
     # md.rsmd isn't picklable, so this is a little proxy
     return md.rmsd(X, Y, yi, precentered=True)

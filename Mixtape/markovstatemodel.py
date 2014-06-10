@@ -196,7 +196,7 @@ class MarkovStateModel(BaseEstimator):
             u = np.real_if_close(u[order][:n_timescales+1])
             v = np.real_if_close(v[:, order][:, :n_timescales+1])
         else:
-            u, v = scipy.sparse.linalg.eigs(self.transmat_, k=n_timescales + 1)
+            u, v = scipy.sparse.linalg.eigs(self.transmat_, k=n_timescales + 1, which='LR')
 
         order = np.argsort(-np.real(u))
         u = np.real_if_close(u[order])
@@ -206,7 +206,7 @@ class MarkovStateModel(BaseEstimator):
         return timescales
 
     def score(self, sequences, y=None):
-        u, V = scipy.sparse.linalg.eigs(self.transmat_, k=self.n_timescales + 1)
+        u, V = scipy.sparse.linalg.eigs(self.transmat_, k=self.n_timescales + 1, which='LR')
         order = np.argsort(-np.real(u))
         u = np.real_if_close(u[order])
         V = np.real_if_close(V[:, order])
