@@ -107,6 +107,12 @@ class MarkovStateModel(BaseEstimator):
         self.n_timescales = n_timescales
         self.prior_counts = prior_counts
 
+        # Keep track of whether to recalculate eigensystem
+        self.is_dirty = True
+        # Cached results
+        self._eigenvectors = None
+        self._eigenvalues = None
+
         available_reversible_type = ['mle', 'MLE', 'transpose', 'Transpose', None]
         if self.reversible_type not in available_reversible_type:
             raise ValueError('symmetrize must be one of %s: %s' % (
@@ -170,7 +176,36 @@ class MarkovStateModel(BaseEstimator):
             raise RuntimeError()
         self.populations_ /= self.populations_.sum()  # ensure normalization
 
+        self.is_dirty = True
+
         return self
+
+    def score_ll(self, sequences):
+        """log of the likelihood of sequences with respect to the model
+
+        Parameters
+        ----------
+        sequences : list
+            List of integer sequences, each of which is one-dimensional
+
+        Returns
+        -------
+        loglikelihood : float
+            The natural log of the likelihood, computed as
+            :math:`\sum_{ij} C_{ij} \log(P_{ij})`
+            where C is a matrix of counts computed from the input sequences.
+        """
+        counts = self._count_transitions(sequences)
+
+        if not scipy.sparse.isspmatrix(self.transmat_):
+            transition_matrix = scipy.sparse.csr_matrix(self.transmat_)
+        else:
+            transition_matrix = self.transmat_.tocsr()
+        row, col = counts.nonzero()
+
+        return np.sum(np.log(np.asarray(transition_matrix[row, col]))
+                      * np.asarray(counts[row, col]))
+
 
     def _count_transitions(self, sequences):
         counts = scipy.sparse.coo_matrix((self.n_states, self.n_states), dtype=np.float32)
@@ -184,22 +219,26 @@ class MarkovStateModel(BaseEstimator):
 
         return counts
 
-    @property
-    def timescales_(self):
+    def _get_eigensystem(self):
+        if not self.is_dirty:
+            return self._eigenvalues, self._eigenvectors_
+
         n_timescales = self.n_timescales
         if n_timescales is None:
             n_timescales = self.transmat_.shape[0] - 3
 
-        if self.transmat_.shape[0] < 10:
-            u, v = scipy.linalg.eig(self.transmat_.todense())
-            order = np.argsort(-np.real(u))
-            u = np.real_if_close(u[order][:n_timescales+1])
-            v = np.real_if_close(v[:, order][:, :n_timescales+1])
-        else:
-            u, v = scipy.sparse.linalg.eigs(self.transmat_, k=n_timescales + 1, which='LR')
-
         order = np.argsort(-np.real(u))
         u = np.real_if_close(u[order])
+        v = np.real_if_close(v[:, order])
+
+        self._eigenvalues = u
+        self._eigenvectors = v
+
+        return u, v
+
+    @property
+    def timescales_(self):
+        u, v = self._get_eigensystem()
 
         # make sure to leave off equilibrium distribution
         timescales = - self.lag_time / np.log(u[1:])
@@ -237,6 +276,11 @@ class MarkovStateModel(BaseEstimator):
             trace = np.nan
 
         return trace
+
+    @property
+    def eigenvectors_(self):
+        u, v = self._get_eigensystem()
+        return v
 
 
 def ndgrid_msm_likelihood_score(estimator, sequences):
@@ -307,3 +351,4 @@ def _apply_mapping_to_matrix(mat, mapping):
         except KeyError:
             pass
     return mat_new
+
