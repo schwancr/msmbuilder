@@ -412,7 +412,8 @@ class DistributedGridSearchCV(DistributedBaseSeachCV):
             estimator, scoring=scoring, loss_func=loss_func,
             score_func=score_func, fit_params=fit_params, iid=iid,
             refit=refit, cv=cv, verbose=verbose, client=client,
-            return_train_scores=return_train_scores, tmp_dir=tmp_dir, log_file)
+            return_train_scores=return_train_scores, tmp_dir=tmp_dir,
+            log_file=log_file)
         self.param_grid = param_grid
         _check_param_grid(param_grid)
 
