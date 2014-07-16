@@ -60,6 +60,9 @@ def verbose_wait(amr, clientview, return_train_scores, log, verbose):
         print_ = lambda *args, **kwargs: None
 
     N = len(amr)
+    if N == 0:
+        return
+
     pending = set(amr.msg_ids)
     while pending:
         try:
@@ -217,7 +220,8 @@ class DistributedBaseSeachCV(BaseSearchCV):
             if verbose > 0:
                 async.display_outputs()
             try:
-                out = async.result
+                if len(async) > 0:
+                    out = async.result
             except RemoteError as e:
                 e.print_traceback()
                 raise
@@ -229,6 +233,10 @@ class DistributedBaseSeachCV(BaseSearchCV):
                     os.unlink(fn)
 
         # Out is a list of triplet: score, estimator, n_test_samples
+        if self.log_file is not None:
+            with open(self.log_file) as f:
+                out = [json.loads(line) for line in f]
+        assert out is not None
         n_fits = len(out)
         n_folds = len(cv)
 
@@ -241,20 +249,14 @@ class DistributedBaseSeachCV(BaseSearchCV):
             train_scores = []
             all_train_scores = [] if self.return_train_scores else None
             for items in out[grid_start:grid_start + n_folds]:
-                # unpack variable number of return values from _fit_and_score
-                # depending on self.return_train_scores
-                if self.return_train_scores:
-                    this_train_score, this_score, this_n_test_samples, \
-                        _, parameters = items
-                else:
-                    this_score, this_n_test_samples, _, parameters = items
-
+                this_score = items['test_score']
+                parameters = items['parameters']
                 all_scores.append(this_score)
                 if self.return_train_scores:
-                    all_train_scores.append(this_train_score)
+                    all_train_scores.append(items['train_score'])
                 if self.iid:
-                    this_score *= this_n_test_samples
-                    n_test_samples += this_n_test_samples
+                    this_score*= items['n_test_samples']
+                    n_test_samples += items['n_test_samples']
                 score += this_score
             if self.iid:
                 score /= float(n_test_samples)
