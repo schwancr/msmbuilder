@@ -57,7 +57,7 @@ def _fit_and_score_helper(args):
 def verbose_wait(amr, clientview, return_train_scores, log, verbose):
     print_ = print
     if verbose <= 0:
-        print_ = lambda *args: None
+        print_ = lambda *args, **kwargs: None
 
     N = len(amr)
     pending = set(amr.msg_ids)
