@@ -217,7 +217,7 @@ class DistributedBaseSeachCV(BaseSearchCV):
             if verbose > 0:
                 async.display_outputs()
             try:
-                out = async.result
+                out = async.result if len(async) > 0 else []
             except RemoteError as e:
                 e.print_traceback()
                 raise
@@ -229,6 +229,10 @@ class DistributedBaseSeachCV(BaseSearchCV):
                     os.unlink(fn)
 
         # Out is a list of triplet: score, estimator, n_test_samples
+        if self.log_file is not None:
+            with open(self.log_file) as f:
+                out.extend([json.loads(line) for line in f])
+
         n_fits = len(out)
         n_folds = len(cv)
 
