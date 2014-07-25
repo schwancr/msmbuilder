@@ -122,10 +122,10 @@ def _propagate1d(x0, n_steps, grad_potential, random, bc_min=None, bc_max=None):
         bc = lambda x: _reflect_boundary_conditions(x, bc_min, bc_max)
 
     rand = random.randn(n_steps)
-    x = np.zeros(n_steps+1)
+    x = np.zeros((n_steps+1, len(x0)))
     x[0] = x0
     for i in range(n_steps):
-        x_i_plus_1 = x[i] -DT * grad_potential(x[i]) + DT_SQRT_2D*rand[i]
+        x_i_plus_1 = x[i] - DT * grad_potential(x[i]) + DT_SQRT_2D*rand[i]
         x[i+1] = bc(x_i_plus_1)
 
     print('%d steps/s' % (n_steps / (time.time() - start)))
