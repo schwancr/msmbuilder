@@ -7,13 +7,6 @@ cdef extern from "src/muller.c":
     void _muller_grad(const double x[2], double beta, double grad[2]) nogil
     double _muller_potential(double x[2], double beta) nogil
 
-cdef double *MULLER_aa = [-1, -1, -6.5, 0.7]
-cdef double *MULLER_bb = [0, 0, 11, 0.6]
-cdef double *MULLER_cc = [-10, -10, -6.5, 0.7]
-cdef double *MULLER_AA = [-200, -100, -170, 15]
-cdef double *MULLER_XX = [1, 0, -0.5, -1]
-cdef double *MULLER_YY = [0, 0.5, 1.5, 1]
-
 
 def muller_potential(x, y):
     """Muller potential.
