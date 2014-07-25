@@ -347,6 +347,12 @@ extensions.append(
               include_dirs=[np.get_include()]))
 
 extensions.append(
+    Extension('mixtape.datasets._muller',
+              sources=['Mixtape/datasets/_muller.pyx'],
+              libraries=['m'],
+              include_dirs=[np.get_include()]))
+
+extensions.append(
     Extension('mixtape.cluster._regularspatialc',
               sources=['Mixtape/cluster/_regularspatialc.pyx'],
               libraries=['m'],
