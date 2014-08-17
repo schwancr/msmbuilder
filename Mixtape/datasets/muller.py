@@ -85,7 +85,7 @@ def load_muller(data_home=None, random_state=None):
     -----
     """
     random = check_random_state(random_state)
-    data_home = join(get_data_home(data_home=data_home), 'doublewell')
+    data_home = join(get_data_home(data_home=data_home), 'muller')
     if not exists(data_home):
         makedirs(data_home)
 
