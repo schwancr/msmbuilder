@@ -14,13 +14,12 @@ import tempfile
 import subprocess
 from distutils.ccompiler import new_compiler
 from distutils.spawn import find_executable
+from setuptools import setup, Extension, find_packages
+
 import numpy as np
 from numpy.distutils import system_info
 
-try:
-    from setuptools import setup, Extension
-except ImportError:
-    from distutils.core import setup, Extension
+
 try:
     import Cython
     from Cython.Distutils import build_ext
@@ -353,6 +352,21 @@ extensions.append(
               include_dirs=[np.get_include()]))
 
 extensions.append(
+    Extension('mixtape.markovstatemodel._markovstatemodel',
+              sources=['Mixtape/markovstatemodel/_markovstatemodel.pyx',
+                       'Mixtape/markovstatemodel/src/transmat_mle_prinz.c'],
+              libraries=['m'],
+              include_dirs=['Mixtape/markovstatemodel/src', np.get_include()]))
+
+extensions.append(
+    Extension('mixtape.markovstatemodel._metzner_mcmc_fast',
+              sources=['Mixtape/markovstatemodel/_metzner_mcmc_fast.pyx',
+                       'Mixtape/markovstatemodel/src/metzner_mcmc.c'],
+              libraries=['m'] + libraries,
+              extra_compile_args=extra_compile_args,
+              include_dirs=['Mixtape/markovstatemodel/src', np.get_include()]))
+
+extensions.append(
     Extension('mixtape.cluster._regularspatialc',
               sources=['Mixtape/cluster/_regularspatialc.pyx'],
               libraries=['m'],
@@ -442,10 +456,8 @@ setup(name='mixtape',
       url='https://github.com/rmcgibbo/mixtape',
       platforms=['Linux', 'Mac OS-X', 'Unix'],
       classifiers=CLASSIFIERS.splitlines(),
-      packages=['mixtape', 'mixtape.commands', 'mixtape.datasets',
-                'mixtape.mslds_solvers', 'mixtape.cluster',
-                'mixtape.mslds_solvers.sparse_sdp'],
-      package_dir={'mixtape':'Mixtape'},
+      packages=['mixtape'] + ['mixtape.%s' % e for e in find_packages('Mixtape')],
+      package_dir={'mixtape': 'Mixtape'},
       scripts=['scripts/hmsm', 'scripts/mixtape', 'scripts/pbsipcluster'],
       zip_safe=False,
       ext_modules=extensions,
