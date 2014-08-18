@@ -74,7 +74,7 @@ def load_doublewell(data_home=None, random_state=None):
     if random_state is None:
         trajectories = _simulate_doublewell(random)
     else:
-        assert isinstance(random_state, numbers.Integral), 'random_state must be an int'
+        assert isinstance(random_state, numbers.Integral), 'random_state but be an int'
         path = join(data_home, 'version-1_random-state-%d.pkl' % random_state)
         if exists(path):
             trajectories = verboseload(path)
@@ -122,10 +122,10 @@ def _propagate1d(x0, n_steps, grad_potential, random, bc_min=None, bc_max=None):
         bc = lambda x: _reflect_boundary_conditions(x, bc_min, bc_max)
 
     rand = random.randn(n_steps)
-    x = np.zeros((n_steps+1, len(x0)))
+    x = np.zeros(n_steps+1)
     x[0] = x0
     for i in range(n_steps):
-        x_i_plus_1 = x[i] - DT * grad_potential(x[i]) + DT_SQRT_2D*rand[i]
+        x_i_plus_1 = x[i] -DT * grad_potential(x[i]) + DT_SQRT_2D*rand[i]
         x[i+1] = bc(x_i_plus_1)
 
     print('%d steps/s' % (n_steps / (time.time() - start)))
