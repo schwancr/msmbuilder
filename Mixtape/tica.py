@@ -110,11 +110,14 @@ class tICA(BaseEstimator, TransformerMixin):
        (1994): 3634.
     """
     
-    def __init__(self, n_components=None, lag_time=1, gamma=0.05, weighted_transform=False):
+    def __init__(self, n_components=None, lag_time=1, gamma=0.05, 
+                 weighted_transform=False, pca_cutoff=-np.inf):
         self.n_components = n_components
         self.lag_time = lag_time
         self.gamma = gamma
         self.weighted_transform = weighted_transform
+
+        self.pca_cutoff = pca_cutoff
 
         self.n_features = None
         self.n_observations_ = None
@@ -173,15 +176,25 @@ class tICA(BaseEstimator, TransformerMixin):
         if not np.allclose(self.covariance_, self.covariance_.T):
             raise RuntimeError('correlation matrix is not symmetric')
 
-        rhs = self.covariance_ + (self.gamma / self.n_features) * \
-                np.trace(self.covariance_) * np.eye(self.n_features)
-        vals, vecs = scipy.linalg.eigh(self.offset_correlation_, b=rhs,
+        pca_vals, pca_vecs = scipy.linalg.eigh(self.covariance_)
+        ind = np.where(pca_vals >= self.pca_cutoff)[0]
+        pca_vals = pca_vals[ind]
+        pca_vecs = pca_vecs[:, ind]
+
+        pca_cov = pca_vecs.T.dot(self.covariance_).dot(pca_vecs)
+        pca_corr = pca_vecs.T.dot(self.offset_correlation_).dot(pca_vecs)
+
+        rhs = pca_cov + (self.gamma / self.n_features) * \
+                np.trace(pca_cov) * np.eye(self.n_features)
+        vals, vecs = scipy.linalg.eigh(pca_corr, b=rhs,
             eigvals=(self.n_features-self.n_components, self.n_features-1))
 
         # sort in order of decreasing value
         ind = np.argsort(vals)[::-1]
         vals = vals[ind]
         vecs = vecs[:, ind]
+
+        vecs = pca_vecs.dot(vecs)
 
         self._eigenvalues_ = vals
         self._eigenvectors_ = vecs
