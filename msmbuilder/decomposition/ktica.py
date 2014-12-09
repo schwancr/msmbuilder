@@ -2,13 +2,13 @@
 import numpy as np
 import scipy.linalg
 from mdtraj import io
-import pickle
+from sklearn.metrics.pairwise import pairwise_kernels
 from ..base import BaseEstimator
 from sklearn.base import TransformerMixin
 
 class ktICA(BaseEstimator, TransformerMixin):
     """ 
-    Time-structure Indpendent Componenent Analysis (tICA) using the kernel
+    Time-structure Independent Componenent Analysis (tICA) using the kernel
     trick. 
 
     The kernel trick allows one to extend a linear method (e.g. tICA) to
@@ -96,7 +96,6 @@ class ktICA(BaseEstimator, TransformerMixin):
         self.coef0 = float(coef0)
         self.eta = float(eta)
 
-
         self.lag_time = int(lag_time)
         self.stride = int(stride)
         self.n_components = int(n_components)
@@ -117,19 +116,21 @@ class ktICA(BaseEstimator, TransformerMixin):
                 'coef' : self.coef0}
 
 
-    def fit(self, X):
+    def fit(self, sequences):
         r"""
         Fit the model to a given timeseries
         
         Parameters
         ----------
-        X : array-like, shape = [n_sequences, n_samples, n_features]
-            if X_dt is None, then this is a time series and pairs of 
-            points will be sampled from it. Otherwise, these are the
-            initial points to the corresponding points in X_dt
-            
+        sequences : array-like, shape = [n_sequences, n_samples, n_features]
+            A set of sequences to fit the model to.           
             If the kernel you specified is 'precomputed', then X should
-            be the UNCENTERED gram matrix of inner products such that:
+            be the UNCENTERED gram matrix of inner products.
+
+        Returns
+        -------
+        self : object
+            Returns the instance itself.
         """
 
         if self.kernel == 'precomputed':
@@ -139,26 +140,25 @@ class ktICA(BaseEstimator, TransformerMixin):
             self.uncentered_gram_matrix_ = X
             self.__Xfit = None
             # this will throw errors if we try to access this later
-            self.n_datapoints_ = X.shape[0]
+            self.n_datapoints_ = self.uncentered_gram_matrix_.shape[0]
 
         else:
             # sequences holding the subsampled points
             X_0 = []
             X_t = []
 
-            for seq in X:
+            for seq in sequences:
                 seq_t = seq[self.lag_time::stride]
                 seq_0 = seq[::stride][:len(seq_t)]
                 X_0.append(seq_0)
                 X_t.append(seq_t)
 
             self.__Xfit = np.concatenate([np.concatenate(X_0), np.concatenate(X_t)])
-
             self.n_datapoints_ = len(self.__Xfit)
 
             self.uncentered_gram_matrix_ = pairwise_kernels(self.__Xfit, metric=self.kernel,
                                                             n_jobs=-1, filter_params=True,
-                                                            kwds=self._kernel_params)           
+                                                            **self._kernel_params)           
 
         # just make sure it's actually symmetric
         self.uncentered_gram_matrix = (self.uncentered_gram_matrix_ + self.uncentered_gram_matrix_.T) * 0.5
@@ -199,14 +199,16 @@ class ktICA(BaseEstimator, TransformerMixin):
         vec_vars = np.sum(vKK * vecs.T, axis=1) / self.n_datapoints_
         self.eigenvectors_ = vecs / np.sqrt(vec_vars)
 
+        return self
 
-    def transform(self, X):
+
+    def transform(self, sequences):
         """
-        project a point onto the top `n_components` ktICs
+        Project a point onto the top `n_components` ktICs
 
         Parameters
         ----------
-        X : np.ndarray, shape = [n_points, n_features]
+        sequences : np.ndarray, shape = [n_sequences, n_points, n_features]
             Data to project onto eigenvector. If kernel == 'precomputed'
             Then this must be a kernel matrix, where:
                 X[i, j] = kernel(Xfit[i], Xnew[j]) 
@@ -214,24 +216,85 @@ class ktICA(BaseEstimator, TransformerMixin):
 
         Returns
         -------
-        Xnew : np.ndarray, shape = [n_points, n_components]
-            projected value of each point in the trajectory
+        Xnew : np.ndarray, shape = [n_sequences, n_points, n_components]
+            Projected value of each point in each trajectory
         """
+        sequence_new = []
+        for Y in sequences:
+            Ku = pairwise_kernels(self.__Xfit, Y=Y, metric=self.kernel,
+                                  filter_params=True, n_jobs=-1, 
+                                  **self._kernel_params)
+            # rows are training points, columns are test points
 
-        Ku = pairwise_kernels(X, Y=self.__Xfit, metric=self.kernel,
-                              filter_params=True, n_jobs=-1, 
-                              **self._kernel_params)
+            oneN = np.ones((self.n_datapoints_, 1)) / float(self.n_datapoints_)
 
-        N = Ku.shape[0]
-        oneN = np.ones((N, 1)) / float(N)
+            # center this using the mean from the training set
+            K = Ku - self.uncentered_gram_matrix_.dot(oneN) \
+                - oneN.T.dot(Ku) \
+                + oneN.T.dot(self.uncentered_gram_matrix_.dot(oneN))
 
-        K = Ku - self.uncentered_gram_matrix_.dot(oneN) \
-            - oneN.T.dot(Ku) \
-            + oneN.T.dot(self.uncentered_gram_matrix_.dot(oneN))
-
-        Xnew = K.T.dot(self.components_.T)
+            Xnew = (self.components_.dot(K)).T
+            sequence_new.append(Xnew)
         
-        return Xnew
+        return sequence_new
 
-    def score():
-        raise NotImplementedError("I need to compute the GMRQ here.")
+
+    def score(self, sequences, y=None):
+        """
+        Compute the GMRQ for this model given some unobserved data.
+
+        Parameters
+        ----------
+        sequences : list of array-like
+            List of sequences to use for scoring this model. If 
+            kernel is 'precomputed', then this must be a gram 
+            matrix of similarities between the new data (in columns)
+            and the data used to fit the model (in rows)
+
+        Returns
+        -------
+        gmrq : float
+            Generalized matrix Rayleigh quotient. This number indicates how
+            well the top ``n_timescales`` ktICs of this model perform as
+            slowly decorrelating collective variables for the new data in
+            ``sequences``.
+
+        References
+        ----------
+        .. [1] McGibbon, R. T. and V. S. Pande, "Variational cross-validation
+           of slow dynamical modes in molecular kinetics"
+           http://arxiv.org/abs/1407.8083 (2014)
+        """
+        sequence_new = self.transform(sequences)
+
+        X_0 = []
+        X_t = []
+        for seq in sequence_new:
+            if len(seq < self.lag_time):
+                continue
+            seq_0 = seq[:-self.lag_time]
+            seq_t = seq[self.lag_time:]
+
+            X_0.append(seq_0)
+            X_t.append(seq_t)
+
+        X_0 = np.concatenate(X_0)
+        X_t = np.concatenate(X_t)
+
+        mu = np.mean(np.concatenate([X_0, X_t]))
+
+        X_0 -= mu
+        X_t -= mu
+
+        numerator = X_0.T.dot(X_t) / (2.0 * len(X_0))
+        numerator = (numerator + numerator.T) / 2.0
+
+        denominator = X_0.T.dot(X_0) + X_t.T.dot(X_t)
+        denominator = denominator / (2.0 * len(X_0))
+
+        try:
+            trace = np.trace(numerator.dot(np.linalg.inv(denominator)))
+        except:
+            trace = np.nan
+
+        return trace
