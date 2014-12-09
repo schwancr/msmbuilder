@@ -3,113 +3,201 @@ import numpy as np
 import scipy.linalg
 from mdtraj import io
 import pickle
-from klearn.methods import BaseKernelEstimator
+from ..base import BaseEstimator
 from sklearn.base import TransformerMixin
 
-class ktICA(BaseKernelEstimator, TransformerMixin):
+class ktICA(BaseEstimator, TransformerMixin):
     """ 
-    class for calculating tICs in a high dimensional feature space
+    Time-structure Indpendent Componenent Analysis (tICA) using the kernel
+    trick. 
+
+    The kernel trick allows one to extend a linear method (e.g. tICA) to
+    include non-linear solutions. 
+
+    <Add some exposition here>
+
+    Parameters
+    ----------
+    kernel : str or callable
+        The kernel function to define similarities in the feature space.
+        It must be one of:
+            - 'linear' : linear kernel (dot product in the input space)
+            - 'poly' : polynomial kernel
+            - 'rbf' : radial basis function 
+            - 'sigmoid' :
+            - 'precomputed' : the precomputed gram matrix will be passed
+                              to ktICA.fit().
+            - callable : function that takes two datasets and returns
+                         a matrix of similarities
+    degree : int, optional
+        Degree of the polynomial kernel. This is only used if kernel
+        is 'poly'.
+    gamma : float, optional
+        Kernel coefficient for 'rbf', 'poly', and 'sigmoid'. If gamma == 0.0,
+        then will use 1 / n_features.
+    coef0 : float, optional
+        Independent term in 'poly' and 'sigmoid'.
+    lag_time : int, optional
+        Lag time to define the offset correlation matrix.
+    stride : int, optional
+        Only sample pairs of points from the data according to this stride
+    eta : float, optional
+        Regularization strength for solving the ktICA problem
+    n_components : int, optional
+        Number of components to project onto in the `transform` method
+        and to use when scoring.
+
+    Attributes
+    ----------
+    components_ : array-like, shape (n_components, n_datapoints)
+        Components with maximum autocorrelation; n_datapoints is equal
+        to twice the number of pairs of points used to fit the model.
+    eigenvalues_ : array-like, shape (n_datapoints,)
+        Eigenvalues of the tICA generalized eigenproblem, in decreasing
+        order.
+    eigenvectors_ : array-like, shape (n_datapoints, n_datapoints)
+        ALLT Eigenvectors of the tICA generalized eigenproblem. The vectors
+        give a set of "directions" through configuration space along
+        which the system relaxes towards equilibrium. Each eigenvector
+        is associated with characteristic timescale
+        :math:`- \frac{lag_time}{ln \lambda_i}, where :math:`lambda_i` is
+        the corresponding eigenvector. 
+        The eigenvectors are stored in columns and normalized to have
+        unit variance according to the training data.
+    uncentered_gram_matrix_ : array-like, shape (n_datapoints, n_datapoints)
+        The uncentered gram matrix of similarities.
+    n_datapoints_ : int
+        Total number of data points fit by the model. This is equal to
+        two times the number of pairs sampled during fitting.
+    timescales_ : array-like, shape (n_components,)
+        The implied timescales of the tICA model, given by
+        - lag_time / log(eigenvalues)
+
+    Notes
+    -----
+    There are many ways to approximate the kernel solution to the tICA
+    problem that are not nearly as computationally intense as this 
+    method. Checkout sklearn.kernel_approximation for details.
     """
+    _available_kernels = ['rbf', 'sigmoid', 'linear', 'poly'] 
+    
+    def __init__(self, kernel='rbf', degree=3, gamma=1.0, lag_time=1, 
+                 stride=1, n_components=1, eta=1.0):
 
-    def __init__(self, kernel, dt, n_components=1, eta=1.0):
+        if not kernel in _available_kernels:
+            if kernel != 'precomputed':
+                if not callable(kernel):
+                    raise ValueError("kernel must be one of %s or 'precomputed' or a callable function" % str(_available_kernels))
 
-        """
-        Initialize an instance of the ktICA solver
+        self.kernel = kernel
 
-        Paramaters
-        ----------
-        kernel : klearn.kernels.AbstractKernel instance
-            kernel object
-        dt : int
-            correlation lag time to compute the time-lag correlation matrix
-        n_components : int, optional
-            number of ktICs to use in transforming the data.
-        eta : float, optional
-            regularization strength
-        """
-
-        super(ktICA, self).__init__(kernel)
-
+        self.degree = int(degree)
+        self.gamma = float(gamma)
+        self.coef0 = float(coef0)
         self.eta = float(eta)
-        self.dt = int(dt)
+
+
+        self.lag_time = int(lag_time)
+        self.stride = int(stride)
         self.n_components = int(n_components)
 
+    @property
+    def components_(self):
+        return self.eigenvectors_[:, self.n_components].T
 
-    def fit(self, X, X_dt=None, gram_matrix=None):
+
+    @property
+    def timescales_(self):
+        return - self.lag_time / np.log(self.eigenvalues_[:self.n_components])
+
+
+    @property
+    def _kernel_params(self):
+        return {'degree' : self.degree, 'gamma' : self.gamma, 
+                'coef' : self.coef0}
+
+
+    def fit(self, X):
         r"""
         Fit the model to a given timeseries
         
         Parameters
         ----------
-        X : np.ndarray, shape = [n_samples, n_features]
+        X : array-like, shape = [n_sequences, n_samples, n_features]
             if X_dt is None, then this is a time series and pairs of 
             points will be sampled from it. Otherwise, these are the
             initial points to the corresponding points in X_dt
-        X_dt : np.ndarray, optional, shape = [n_samples, n_features]
-            If not none, then these are the points that are `dt` timesteps
-            after the corresponding points in X
-        gram_matrix : np.ndarray, optional, shape = [n_points * 2, n_points * 2]
-            UNCENTERED gram matrix of inner products such that:
             
-                `Xnew = concatenate([X, X_dt])`
-                `gram_matrix[i, j] = inner(Xnew[i], Xnew[j])`
-            
-            The number of points varies depending on X_dt:
-                - If X_dt is None, then `n_points = n_samples - dt`
-                - If X_dt is an array, then `n_points = n_samples`
+            If the kernel you specified is 'precomputed', then X should
+            be the UNCENTERED gram matrix of inner products such that:
         """
 
-        if X_dt is None:
-            self._Xtrain = np.concatenate([X[:- self.dt], X[self.dt:]])
+        if self.kernel == 'precomputed':
+            if X.shape[0] != X.shape[1]:
+                raise ValueError("X is supposed to be square for kernel='precomputed'")
+
+            self.uncentered_gram_matrix_ = X
+            self.__Xfit = None
+            # this will throw errors if we try to access this later
+            self.n_datapoints_ = X.shape[0]
+
         else:
-            self._Xtrain = np.concatenate([X, X_dt])
+            # sequences holding the subsampled points
+            X_0 = []
+            X_t = []
 
-        n_points = len(self._Xtrain) / 2
+            for seq in X:
+                seq_t = seq[self.lag_time::stride]
+                seq_0 = seq[::stride][:len(seq_t)]
+                X_0.append(seq_0)
+                X_t.append(seq_t)
 
-        if gram_matrix is None:
-            self.Ku = self.kernel(self._Xtrain)
+            self.__Xfit = np.concatenate([np.concatenate(X_0), np.concatenate(X_t)])
 
-        else:
-            if gram_matrix.shape != (2 * n_points, 2 * n_points):
-                raise Exception("gram matrix is not the correct shape")
+            self.n_datapoints_ = len(self.__Xfit)
 
-            self.Ku = gram_matrix
+            self.uncentered_gram_matrix_ = pairwise_kernels(self.__Xfit, metric=self.kernel,
+                                                            n_jobs=-1, filter_params=True,
+                                                            kwds=self._kernel_params)           
 
+        # just make sure it's actually symmetric
+        self.uncentered_gram_matrix = (self.uncentered_gram_matrix_ + self.uncentered_gram_matrix_.T) * 0.5
 
-        self.Ku = (self.Ku + self.Ku.T) * 0.5
-
-        oneN = np.ones(self.Ku.shape[0]) / float(2 * n_points)
+        # matrix used when centering
+        oneN = np.ones(self.n_datapoints_) / float(self.n_datapoints_)
         oneN.reshape((-1, 1))
 
-        self.K = self.Ku - oneN.T.dot(self.Ku) - self.Ku.dot(oneN) + oneN.T.dot(self.Ku.dot(oneN))
+        self.gram_matrix_ = self.uncentered_gram_matrix_ \
+                            - oneN.T.dot(self.uncentered_gram_matrix_) \
+                            - self.uncentered_gram_matrix_.dot(oneN) \
+                            + oneN.T.dot(self.uncentered_gram_matrix_.dot(oneN))
 
-        self.K = (self.K + self.K.T) * 0.5
+        # again just make sure that there's no rounding issues
+        self.gram_matrix_ = (self.gram_matrix_ + self.gram_matrix_.T) * 0.5
 
-        R = np.zeros(self.K.shape)
-        R[:n_points, n_points:] = np.eye(n_points)
-        R[n_points:, :n_points] = np.eye(n_points)
+        n_pairs = self.n_datapoints / 2
+        R = np.zeros(self.n_datapoints_)
+        R[:n_pairs, n_pairs:] = np.eye(n_pairs)
+        R[n_pairs:, :n_pairs] = np.eye(n_pairs)
 
-        KK = self.K.dot(self.K)
+        KK = self.gram_matrix_.dot(self.gram_matrix_)
 
-        lhs = self.K.dot(R).dot(self.K)
-        rhs = KK + self.eta * np.eye(2 * n_points)
+        lhs = self.gram_matrix_.dot(R).dot(self.gram_matrix_)
+        rhs = KK + self.eta * np.eye(self.n_datapoints_)
 
-        self.vals, self.betas = scipy.linalg.eigh(lhs, b=rhs)
+        vals, vecs = scipy.linalg.eigh(lhs, b=rhs)
 
-        dec_ind = np.argsort(self.vals)[::-1]
+        dec_ind = np.argsort(vals)[::-1]
         
-        self.vals = self.vals[dec_ind]
-        self.betas = self.betas[:, dec_ind]
+        self.eigenvalues_ = vals[dec_ind]
+        vecs = vecs[:, dec_ind]
 
-        M = float(self.K.shape[0])
-
-        vKK = self.betas.T.dot(KK)
-
+        # now, normalize the eigenvectors to have unit variance
+        vKK = vecs.T.dot(KK)
         # not sure if I should compute the variance based on
         # the regularization strength or not :/
-        self.vec_vars = np.sum(vKK * self.betas.T, axis=1) / M
-
-        self.betas = self.betas / np.sqrt(self.vec_vars)
+        vec_vars = np.sum(vKK * vecs.T, axis=1) / self.n_datapoints_
+        self.eigenvectors_ = vecs / np.sqrt(vec_vars)
 
 
     def transform(self, X):
@@ -119,157 +207,31 @@ class ktICA(BaseKernelEstimator, TransformerMixin):
         Parameters
         ----------
         X : np.ndarray, shape = [n_points, n_features]
-            data to project onto eigenvector
-        
+            Data to project onto eigenvector. If kernel == 'precomputed'
+            Then this must be a kernel matrix, where:
+                X[i, j] = kernel(Xfit[i], Xnew[j]) 
+            where Xfit are all of the points used to fit the model.
+
         Returns
         -------
         Xnew : np.ndarray, shape = [n_points, n_components]
             projected value of each point in the trajectory
         """
 
-        Ku = self.kernel(self._Xtrain, X)
+        Ku = pairwise_kernels(X, Y=self.__Xfit, metric=self.kernel,
+                              filter_params=True, n_jobs=-1, 
+                              **self._kernel_params)
 
         N = Ku.shape[0]
         oneN = np.ones((N, 1)) / float(N)
 
-        K = Ku - self.Ku.dot(oneN) - oneN.T.dot(Ku) + oneN.T.dot(self.Ku.dot(oneN))
+        K = Ku - self.uncentered_gram_matrix_.dot(oneN) \
+            - oneN.T.dot(Ku) \
+            + oneN.T.dot(self.uncentered_gram_matrix_.dot(oneN))
 
-        Xnew = K.T.dot(self.betas[:, :self.n_components])
+        Xnew = K.T.dot(self.components_.T)
         
         return Xnew
 
-
-    def score(self, X, X_dt=None, timestep=None):
-        """
-        Evaluate the solutions based on new data X. This uses the assumption that
-        the ktICA solutions are the eigenfunctions of a Transfer operator.
-        This means we can decompose the transfer operator into a sum of terms
-        along each ktICA solution, which gives a probability of a new trajectory.
-
-        Using Bayes' rule this can be translated into the likelihood of the
-        ktICA solution.
-
-        Parameters
-        ----------
-        X : np.ndarray
-            data with features in the second axis
-        X_dt : np.ndarray
-            data such that X_dt[i] is observed one timestep after X[i]. Note
-            that this timestep need not be the same as the dt specified for
-            solving the ktICA solution
-        timestep : time separating X from X_dt (should be in the same units
-            as self.dt
-
-        Returns
-        -------
-        log_like : float
-            log likelihood of the new data given the ktICA solutions
-        """
-
-        if self.betas is None:
-            return - np.inf
-
-        if timestep is None:
-            timestep = self.dt
-
-        if timestep < self.dt:
-            raise Exception("can't model dynamics less than original dt.")
-
-        elif timestep == self.dt:
-            exponent = 1
-
-        else:
-            if (timestep % self.dt):
-                raise Exception("for timestep > dt, timestep must be a multiple of dt.")
-
-            exponent = int(round(timestep / self.dt))
-
-        if X_dt is None:
-            X_dt = X[timestep:]
-            X = X[:-timestep]
-
-        proj_X = self.transform(X)
-        proj_X_dt = self.transform(X_dt)
-        
-        N = proj_X.shape[0]
-        # the first right eigenvector sends everything to unity
-        proj_X = np.hstack([np.ones((N, 1)), proj_X])
-        proj_X_dt = np.hstack([np.ones((N, 1)), proj_X_dt])
-
-        vals = np.concatenate([[1], self.vals[:self.n_components]]).real
-        vals = np.power(vals, exponent)
-        vals = np.reshape(vals, (-1, 1))
-
-        temp_array = proj_X * proj_X_dt
-        # don't multiply by muA because that is the normalization
-        # constraint on the output PDF
-        temp_array = temp_array.dot(vals)
-        # NOTE: The above likelihood is merely proportional to the actual likelihood
-        # we would really need to multiply by a volume of phase space, since this
-        # is the likelihood PDF...
-        #temp_array[np.where(temp_array <=0)] = temp_array[np.where(temp_array > 0)].min() / 1E6
-        bad_ind = np.where(temp_array <= 0)[0]
-        if len(bad_ind) > 0:
-            log_like = - np.inf
-
-        else:
-            log_like = np.log(temp_array).sum()
-
-        return log_like
-
-
-    def save(self, output_fn):
-        """
-        save results to a .h5 file
-        """
-    
-        kernel_str = pickle.dumps(self.kernel)
-
-        io.saveh(output_fn, vals=self.vals,
-            betas=self.betas, K=self.K, 
-            Ku=self.Ku, eta=np.array([self.eta]),
-            Xtrain=self._Xtrain, dt=np.array([self.dt]),
-            kernel_str=np.array([kernel_str]))
-
-
-    @classmethod
-    def load(cls, input_fn, kernel=None):
-        """
-        load a ktica object saved via the .save method. 
-
-        Parameters
-        ----------
-        input_fn : str
-            input filename
-        kernel : kernel instance, optional
-            kernel to use when calculating inner products. If None,
-            then we will look in the file. If it's not there, then an 
-            exception will be raised
-
-        Returns
-        -------
-        kt : ktica instance
-        """
-
-        f = io.loadh(input_fn)
-
-        if not kernel is None:
-            kernel = kernel
-        elif 'kernel_str' in f.keys():
-            kernel = pickle.loads(f['kernel_str'][0])
-        else:
-            raise Exception("kernel_str not found in %s. Need to pass a kernel object")
-
-        kt = cls(kernel, f['dt'][0], eta=f['eta'][0])  
-        # dt and reg_factor were saved as arrays with one element
-
-        kt.Ku = f['Ku']
-        kt.K = f['K']
-
-        kt._Xtrain = f['Xtrain'].astype(np.double)
-
-        kt.vals = f['vals']
-        kt.betas = f['betas']
-     
-        return kt
-
+    def score():
+        raise NotImplementedError("I need to compute the GMRQ here.")
