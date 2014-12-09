@@ -2,12 +2,13 @@
 import numpy as np
 import scipy.linalg
 from mdtraj import io
+from . import tICA
 from sklearn.metrics.pairwise import pairwise_kernels
 from ..base import BaseEstimator
 from sklearn.base import TransformerMixin
 
 class ktICA(BaseEstimator, TransformerMixin):
-    """ 
+    r""" 
     Time-structure Independent Componenent Analysis (tICA) using the kernel
     trick. 
 
@@ -78,16 +79,21 @@ class ktICA(BaseEstimator, TransformerMixin):
     There are many ways to approximate the kernel solution to the tICA
     problem that are not nearly as computationally intense as this 
     method. Checkout sklearn.kernel_approximation for details.
+
+    References
+    ----------
+    .. [1] Schwantes, Christian R. and Vijay S. Pande. "Modeling Molecular
+           Kinetics with tICA and the Kernel Trick." In Review. (2014)
     """
     _available_kernels = ['rbf', 'sigmoid', 'linear', 'poly'] 
     
-    def __init__(self, kernel='rbf', degree=3, gamma=1.0, lag_time=1, 
-                 stride=1, n_components=1, eta=1.0):
+    def __init__(self, kernel='rbf', degree=3, gamma=1.0, coef0=0.0, 
+                 lag_time=1, stride=1, n_components=1, eta=1.0):
 
-        if not kernel in _available_kernels:
+        if not kernel in self._available_kernels:
             if kernel != 'precomputed':
                 if not callable(kernel):
-                    raise ValueError("kernel must be one of %s or 'precomputed' or a callable function" % str(_available_kernels))
+                    raise ValueError("kernel must be one of %s or 'precomputed' or a callable function" % str(self._available_kernels))
 
         self.kernel = kernel
 
@@ -102,7 +108,7 @@ class ktICA(BaseEstimator, TransformerMixin):
 
     @property
     def components_(self):
-        return self.eigenvectors_[:, self.n_components].T
+        return self.eigenvectors_[:, :self.n_components].T
 
 
     @property
@@ -148,8 +154,8 @@ class ktICA(BaseEstimator, TransformerMixin):
             X_t = []
 
             for seq in sequences:
-                seq_t = seq[self.lag_time::stride]
-                seq_0 = seq[::stride][:len(seq_t)]
+                seq_t = seq[self.lag_time::self.stride]
+                seq_0 = seq[::self.stride][:len(seq_t)]
                 X_0.append(seq_0)
                 X_t.append(seq_t)
 
@@ -157,7 +163,7 @@ class ktICA(BaseEstimator, TransformerMixin):
             self.n_datapoints_ = len(self.__Xfit)
 
             self.uncentered_gram_matrix_ = pairwise_kernels(self.__Xfit, metric=self.kernel,
-                                                            n_jobs=-1, filter_params=True,
+                                                            n_jobs=1, filter_params=True,
                                                             **self._kernel_params)           
 
         # just make sure it's actually symmetric
@@ -175,8 +181,8 @@ class ktICA(BaseEstimator, TransformerMixin):
         # again just make sure that there's no rounding issues
         self.gram_matrix_ = (self.gram_matrix_ + self.gram_matrix_.T) * 0.5
 
-        n_pairs = self.n_datapoints / 2
-        R = np.zeros(self.n_datapoints_)
+        n_pairs = self.n_datapoints_ / 2
+        R = np.zeros((self.n_datapoints_, self.n_datapoints_))
         R[:n_pairs, n_pairs:] = np.eye(n_pairs)
         R[n_pairs:, :n_pairs] = np.eye(n_pairs)
 
@@ -222,7 +228,7 @@ class ktICA(BaseEstimator, TransformerMixin):
         sequence_new = []
         for Y in sequences:
             Ku = pairwise_kernels(self.__Xfit, Y=Y, metric=self.kernel,
-                                  filter_params=True, n_jobs=-1, 
+                                  filter_params=True, n_jobs=1, 
                                   **self._kernel_params)
             # rows are training points, columns are test points
 
@@ -235,7 +241,6 @@ class ktICA(BaseEstimator, TransformerMixin):
 
             Xnew = (self.components_.dot(K)).T
             sequence_new.append(Xnew)
-        
         return sequence_new
 
 
@@ -267,34 +272,14 @@ class ktICA(BaseEstimator, TransformerMixin):
         """
         sequence_new = self.transform(sequences)
 
-        X_0 = []
-        X_t = []
-        for seq in sequence_new:
-            if len(seq < self.lag_time):
-                continue
-            seq_0 = seq[:-self.lag_time]
-            seq_t = seq[self.lag_time:]
+        # We can use the tICA machinery to compute the autocorrelations
+        # we need.
+        tica_obj = tICA(lag_time=self.lag_time)
+        tica_obj.fit(sequence_new)
+        trace = tica_obj.eigenvalues_.sum()
 
-            X_0.append(seq_0)
-            X_t.append(seq_t)
-
-        X_0 = np.concatenate(X_0)
-        X_t = np.concatenate(X_t)
-
-        mu = np.mean(np.concatenate([X_0, X_t]))
-
-        X_0 -= mu
-        X_t -= mu
-
-        numerator = X_0.T.dot(X_t) / (2.0 * len(X_0))
-        numerator = (numerator + numerator.T) / 2.0
-
-        denominator = X_0.T.dot(X_0) + X_t.T.dot(X_t)
-        denominator = denominator / (2.0 * len(X_0))
-
-        try:
-            trace = np.trace(numerator.dot(np.linalg.inv(denominator)))
-        except:
-            trace = np.nan
+        trace2 = np.trace(tica_obj.offset_correlation_.dot(np.linalg.inv(tica_obj.covariance_)))
+        
+        assert trace == trace2
 
         return trace
