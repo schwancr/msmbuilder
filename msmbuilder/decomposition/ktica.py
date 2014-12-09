@@ -274,10 +274,9 @@ class ktICA(BaseEstimator, TransformerMixin):
 
         # We can use the tICA machinery to compute the autocorrelations
         # we need.
-        tica_obj = tICA(lag_time=self.lag_time)
+        tica_obj = tICA(lag_time=self.lag_time, gamma=0.0)
         tica_obj.fit(sequence_new)
         trace = tica_obj.eigenvalues_.sum()
-
         trace2 = np.trace(tica_obj.offset_correlation_.dot(np.linalg.inv(tica_obj.covariance_)))
         
         assert trace == trace2
